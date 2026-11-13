@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crumb – Sourdough Keeper</title>
+<meta name="theme-color" content="#f6efe4">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f6efe4;--card:#fffaf2;--ink:#2b2118;--mute:#7a6a5a;--line:#e4d8c6;
+  --accent:#a8521c;--accent-ink:#fff;--soft:#f0e3d0;
+  --good:#3d7a45;--goodbg:#e3f1e0;--info:#2f6690;--infobg:#e1edf5;
+  --warn:#9a6500;--warnbg:#fbeecb;--bad:#a52a22;--badbg:#f9dedb;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1b1612;--card:#26201a;--ink:#f1e8dc;--mute:#a99a88;--line:#3a3128;
+  --accent:#e08a4a;--accent-ink:#1b1612;--soft:#332a21;
+  --good:#8fd098;--goodbg:#1f3323;--info:#8cc1e6;--infobg:#1b2d3a;
+  --warn:#eac266;--warnbg:#3a2f14;--bad:#f09a92;--badbg:#3d1e1b;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+#app{max-width:560px;margin:0 auto;padding:12px 16px 24px}
+h1{font:700 26px/1.2 Georgia,"Times New Roman",serif;margin:8px 0 4px}
+h2{font:700 13px/1.2 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px}
+h3{font-size:17px;margin:0 0 2px}
+p{margin:6px 0}
+a{color:var(--accent)}
+.sub{color:var(--mute);font-size:14px}
+.top{display:flex;align-items:center;gap:8px;min-height:44px}
+.back{display:inline-flex;align-items:center;min-height:44px;padding-right:12px;text-decoration:none;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;display:block;color:inherit;text-decoration:none}
+.row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--soft);color:var(--mute);white-space:nowrap}
+.badge.good{background:var(--goodbg);color:var(--good)}.badge.info{background:var(--infobg);color:var(--info)}
+.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.bad{background:var(--badbg);color:var(--bad)}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 16px system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{min-height:40px;padding:0 12px;font-size:14px}
+.btn.danger{color:var(--bad)}
+.btn.full{width:100%}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btns .btn{flex:1}
+label.f{display:block;margin:14px 0 4px;font-weight:600;font-size:14px}
+.hint{font-weight:400;color:var(--mute);font-size:13px}
+input[type=text],input[type=number],input[type=datetime-local],input[type=date],select,textarea{
+  width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:16px system-ui,sans-serif}
+textarea{min-height:80px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{position:relative}
+.chips input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0}
+.chips span{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);font-size:15px}
+.chips input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chips input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.tip{border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--infobg);border-left:4px solid var(--info)}
+.tip b{display:block}
+.tip.good{background:var(--goodbg);border-color:var(--good)}
+.tip.warn{background:var(--warnbg);border-color:var(--warn)}
+.tip.bad{background:var(--badbg);border-color:var(--bad)}
+.tip p{margin:2px 0 0;font-size:14.5px}
+.log{border-top:1px solid var(--line);padding:10px 0;font-size:14.5px}
+.log:first-child{border-top:0}
+.x{border:0;background:none;color:var(--mute);font-size:20px;min-width:44px;min-height:44px;cursor:pointer}
+.step{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:12px 14px;margin:8px 0}
+.step.done{opacity:.6}
+.step.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.step ul{margin:6px 0;padding-left:20px}
+.step li{margin:3px 0;font-size:15px}
+.num{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--soft);align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-right:8px;flex:none}
+.cur .num{background:var(--accent);color:var(--accent-ink)}
+.count{font:700 22px ui-monospace,Menlo,monospace;white-space:nowrap}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:15px}
+.kv dt{color:var(--mute)}.kv dd{margin:0;font-weight:600}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav a{flex:1;max-width:140px;text-align:center;padding:9px 0 8px;text-decoration:none;color:var(--mute);font-size:12px;font-weight:600}
+nav a svg{display:block;margin:0 auto 2px;width:24px;height:24px}
+nav a.on{color:var(--accent)}
+.empty{text-align:center;padding:28px 10px;color:var(--mute)}
+.check{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid var(--line)}
+.check:first-of-type{border-top:0}
+.check input{width:22px;height:22px;accent-color:var(--accent);flex:none}
+.toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;z-index:9;max-width:90vw}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+'use strict';
+/* ---------- storage ---------- */
+const KEY='crumb.v1';
+const EQUIP=[
+  ['proofer','Proofer','Holds a steady fermentation temperature'],
+  ['thermometer','Probe thermometer','Dough and loaf temperature'],
+  ['mixer','Stand mixer','Mixes the dough for you'],
+  ['scraper','Bench scraper','Preshaping and handling'],
+  ['banneton','Banneton','Proofing basket'],
+  ['fridge','Overnight fridge proof','Cold proof for flavour and easy scoring'],
+  ['dutch','Dutch oven','Traps steam for oven spring'],
+  ['stone','Baking stone or steel','Used when there is no Dutch oven'],
+  ['lame','Lame or razor','Scoring'],
+];
+const CLASSIC={id:'classic',name:'Classic country loaf',flour:450,whole:50,water:375,starter:100,salt:10,folds:4,interval:30,autolyse:45,notes:'75% hydration, 20% starter. A forgiving everyday loaf.'};
+function fresh(){return{settings:{unit:'F',prooferTemp:78,equip:Object.fromEntries(EQUIP.map(e=>[e[0],true]))},starters:[],recipes:[],batches:[]}}
+let S=fresh(),memOnly=false;
+try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);S=Object.assign(fresh(),d);S.settings=Object.assign(fresh().settings,d.settings||{})}}catch(e){memOnly=true}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}}
+
+/* ---------- helpers ---------- */
+const H=3600e3,D=24*H;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>(v===''||v==null||isNaN(+v))?null:+v;
+const U=()=>S.settings.unit;
+const toF=v=>v==null?null:(U()==='C'?v*9/5+32:v);
+const fromF=f=>U()==='C'?Math.round((f-32)*5/9):Math.round(f);
+const T=f=>f==null?'':fromF(f)+'°'+U();
+const Tin=f=>f==null?'':fromF(f);
+const day0=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+function ago(t){const m=Math.round((Date.now()-t)/6e4);if(m<1)return'just now';if(m<60)return m+' min ago';const h=m/60;if(h<36)return (h<10?h.toFixed(1).replace('.0',''):Math.round(h))+' h ago';return Math.round(h/24)+' days ago'}
+function dur(min){min=Math.round(min);if(min<60)return min+' min';const h=Math.floor(min/60),m=min%60;return h+' h'+(m?' '+m+' min':'')}
+function hrsRange(h){const a=Math.max(.5,h*.85),b=h*1.15,r=x=>(Math.round(x*2)/2).toString();return r(a)+'–'+r(b)+' h'}
+function clock(ms){if(ms<=0)return'Done';const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(x).padStart(2,'0')}
+function when(t){return new Date(t).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+function localInput(t){const d=new Date(t-new Date(t).getTimezoneOffset()*6e4);return d.toISOString().slice(0,16)}
+function interp(x,tb){if(x<=tb[0][0])return tb[0][1];for(let i=1;i<tb.length;i++){if(x<=tb[i][0]){const[a,b]=tb[i-1],[c,d]=tb[i];return b+(d-b)*(x-a)/(c-a)}}return tb[tb.length-1][1]}
+function chips(name,opts,sel,req){return'<div class="chips">'+opts.map(([v,l])=>`<label><input type="radio" name="${name}" value="${v}" ${sel===v?'checked':''} ${req?'required':''}><span>${l}</span></label>`).join('')+'</div>'}
+function tipsHtml(tips){return(tips||[]).map(t=>`<div class="tip ${t.lv}"><b>${esc(t.t)}</b><p>${esc(t.b)}</p></div>`).join('')}
+function toast(msg){const d=document.createElement('div');d.className='toast';d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),2600)}
+const starter=id=>S.starters.find(s=>s.id===id);
+const batch=id=>S.batches.find(b=>b.id===id);
+const recipe=id=>id==='classic'?CLASSIC:(S.recipes.find(r=>r.id===id)||CLASSIC);
+const lastOf=(st,type)=>st.log.filter(l=>l.type===type).sort((a,b)=>b.t-a.t)[0];
+const tempField=(name,label,val,hint)=>`<label class="f">${label} (°${U()}) ${hint?`<span class="hint">${hint}</span>`:''}</label><input type="number" inputmode="decimal" step="any" name="${name}" value="${Tin(val)}">`;
+
+/* ---------- starter logic ---------- */
+const RISE=[['none','No rise'],['some','A little'],['x15','About 1.5x'],['x2','Doubled'],['x3','Tripled or more'],['fallen','Risen and fallen']];
+const BUBBLES=[['none','None'],['few','A few small'],['many','Lots throughout'],['big','Large, domed top']];
+const SMELL=[['sweet','Sweet, yeasty'],['tangy','Tangy, yogurt'],['vinegar','Sharp vinegar'],['acetone','Nail polish'],['alcohol','Boozy'],['off','Rotten, off']];
+const TEXTURE=[['thin','Thin, runny'],['batter','Thick batter'],['paste','Stiff paste'],['webby','Stretchy, webby']];
+const SURFACE=[['normal','Normal'],['hooch','Liquid on top'],['crust','Dry skin'],['pink','Pink or orange streaks'],['mold','Fuzzy mold']];
+const PLACE=[['counter','Counter'],['proofer','Proofer'],['fridge','Fridge']];
+const lab=(arr,v)=>(arr.find(a=>a[0]===v)||[,''])[1];
+
+function stDay(st){return Math.floor((day0(Date.now())-day0(st.startDate))/D)+1}
+function stStatus(st){
+  const lf=lastOf(st,'feed'),now=Date.now();
+  if(st.mode==='new'){
+    const d=stDay(st),did=st.log.some(l=>(l.type==='feed'||l.type==='stir')&&day0(l.t)===day0(now));
+    const task=d<=1?'Mix 80 g water + 60 g whole wheat flour':d===2?'Stir, cover, leave 24 h':'Discard 100 g, feed 50 g water + 50 g flour';
+    return{due:!did,lv:did?'good':'warn',label:did?'Done today':'Due today',line:`Day ${d} · ${did?'Done for today':task}`,task,day:d,act:d===2?'stir':'feed'}}
+  if(!lf)return{due:true,lv:'warn',label:'Log a feed',line:'No feedings logged yet',act:'feed'};
+  const h=(now-lf.t)/H,fr=st.storage==='fridge',soon=fr?72:20,late=fr?120:26;
+  const nxt=fr?96:24,left=nxt-h;
+  const line=`Fed ${ago(lf.t)} · `+(left>0?`next feed in about ${left>36?Math.round(left/24)+' days':Math.round(left)+' h'}`:'feed now');
+  if(h>late)return{due:true,lv:'bad',label:'Overdue',line,act:'feed'};
+  if(h>soon)return{due:true,lv:'warn',label:'Feed soon',line,act:'feed'};
+  return{due:false,lv:'good',label:'Fed',line,act:'feed'}}
+function health(st){
+  const c=lastOf(st,'check');
+  if(!c)return st.mode==='new'?['Developing','info']:['No check-in yet',''];
+  if(c.surface==='mold'||c.surface==='pink')return['At risk','bad'];
+  if(c.rise==='x2'||c.rise==='x3')return['Thriving','good'];
+  if(c.rise==='fallen'||c.surface==='hooch'||c.smell==='acetone'||c.smell==='alcohol')return['Hungry','warn'];
+  if((c.rise==='none'||c.rise==='some')&&(c.hrs??0)>=8)return st.mode==='new'?['Developing','info']:['Sluggish','warn'];
+  return['Healthy','good']}
+
+function starterTips(st,c){
+  const tips=[],add=(lv,t,b)=>tips.push({lv,t,b});
+  const lf=st.log.filter(l=>l.type==='feed'&&l.t<=c.t).sort((a,b)=>b.t-a.t)[0];
+  const hrs=c.hrs,temp=c.temp??lf?.temp??null,place=lf?.place||st.storage;
+  const isNew=st.mode==='new',d=isNew?Math.floor((day0(c.t)-day0(st.startDate))/D)+1:0;
+  const kit=S.settings.equip.proofer,pT=T(S.settings.prooferTemp);
+  const warmer=place==='proofer'?`Check the proofer is really holding ${pT}.`:kit?`Move it into your proofer at ${pT}.`:`Without a proofer, try the oven with only the light on, the top of the fridge, or a bowl of warm water around the jar. Aim for ${T(75)}–${T(80)}.`;
+  const ratio=lf&&lf.kept&&lf.flour?lf.flour/lf.kept:null;
+
+  if(c.surface==='mold'||c.surface==='pink'){add('bad','Throw this starter away','Fuzzy mold or pink/orange streaks mean contamination. Do not try to rescue it. Discard everything, wash the jar in very hot soapy water, and start again or use a backup.');return tips}
+  if(place==='fridge'&&(c.rise==='none'||c.rise==='some'))add('info','Slow in the fridge is normal','Cold storage puts the culture to sleep. Judge it after a feed at room temperature, not straight from the fridge.');
+  else if(c.rise==='none'||c.rise==='some'){
+    if(hrs!=null&&hrs<4)add('info','Too early to judge',`Only ${hrs.toFixed(1)} h since feeding. Check again around the 6–8 h mark.`);
+    else if(isNew&&d<=3)add('info','Normal for day '+d,'Very little happens in the first days. Keep to the schedule and keep it warm.');
+    else if(isNew&&d<=10)add('info','The quiet phase','Many starters go flat between days 4 and 10 while the yeast population builds. This is not failure. Keep feeding daily at the same time.');
+    else add('warn','Sluggish','Rise is weak for the time since feeding. Try a thicker feed (a little less water), add a spoon of whole wheat or rye, and use filtered water or tap water left out for an hour if yours is chlorinated.');
+    if(temp!=null&&temp<72)add('warn','It is too cold: '+T(temp),`Activity roughly halves below ${T(70)}. ${warmer}`);
+    else if(temp==null&&!(hrs!=null&&hrs<4))add('info','Check the temperature',`Cool rooms are the most common cause of a slow starter. ${warmer}`);
+  }
+  if(c.rise==='x15')add(hrs!=null&&hrs<6?'good':'info',hrs!=null&&hrs<6?'On its way':'Active but not at full strength',hrs!=null&&hrs<6?'Good progress. It should peak in the next few hours.':'It is rising but not doubling. A day or two of regular feeds in a warm spot usually gets it there.');
+  if(c.rise==='x2'||c.rise==='x3'){
+    if(hrs!=null&&hrs<=6){add('good','Ready to bake with',`Doubled in ${hrs.toFixed(1)} h, which meets the readiness test. Use it now, at or just before its peak.`);
+      if(isNew&&d>=7)add('good','Your starter has matured','It doubles within 6 hours. You can mark it as established on the starter page and move to maintenance feeding.');
+      else if(isNew)add('info','Promising, keep going',`It is only day ${d}. Early bursts are often bacteria, not yeast. Keep the daily schedule until at least day 7.`)}
+    else add('good','Healthy rise',hrs!=null?`Doubled, but it took ${hrs.toFixed(1)} h. To bake with it you want that inside 6 h. ${temp!=null&&temp<75?warmer:'A feed with a bit of whole grain flour will speed it up.'}`:'Doubled since feeding. Note how many hours it takes: inside 6 h means it is ready for bread.');
+    if(c.rise==='x3')add('info','Very strong','Tripling shows plenty of leavening power. Make sure the jar has room, and catch it before it collapses.')}
+  if(c.rise==='fallen'){
+    add('warn','Past its peak','It rose and collapsed, so it has run out of food. It is still healthy. Feed it now.');
+    if(hrs!=null&&hrs<10)add('info','It is eating fast',`It peaked and fell within ${hrs.toFixed(0)} h. Feed a higher ratio (1 part starter to 3 or 5 parts each flour and water)${place==='proofer'?' or lower the proofer a few degrees':' or keep it somewhere cooler'} so the peak lasts until your next feed.`)}
+  if(c.surface==='hooch')add('warn','Hooch: it is hungry','The grey or clear liquid is alcohol from a starved starter. Pour it off for a milder flavour or stir it in for more tang, then feed.'+(st.storage==='fridge'?' In the fridge, feed every 3–5 days.':' Feed more often or at a higher ratio.'));
+  if(c.surface==='crust')add('info','Drying out on top','Scrape off the skin and cover the jar better. A cloth is fine on the counter; use the lid in the fridge.');
+  if(c.smell==='acetone'||c.smell==='alcohol')add('warn','Smells of solvent or alcohol','This is hunger, not spoilage. Feed now, then feed more often or at 1:2:2 for the next few days.'+(st.storage==='fridge'?' After fridge storage, give it two feeds on the counter before baking.':''));
+  if(c.smell==='vinegar')add('info','Very acidic','Sharp vinegar means it has fermented a long time. For milder bread, feed a higher ratio and use it earlier, just as it peaks.');
+  if(c.smell==='off'){if(isNew&&d<=6)add('info','Funky smells are normal early on','In the first week, bacteria that will not survive produce odd smells. They fade as the starter turns acidic. Keep feeding.');else add('warn','Off smell','An established starter should smell tangy or yeasty. Do three feeds at 1:5:5 in a clean jar. If the smell stays or any colour appears, discard it.')}
+  if(c.smell==='sweet'||c.smell==='tangy')if(c.rise!=='none'&&c.rise!=='some')add('good','Smells right','Yeasty, tangy or yogurt-like is what a balanced starter smells like.');
+  if(c.texture==='thin'&&c.rise!=='fallen')add('info','On the thin side','A runny starter rises less visibly and peaks sooner. Use slightly less water at the next feed so it holds its bubbles.');
+  if(c.texture==='paste')add('info','Quite stiff','A stiff starter ferments slower and tastes more sour. Add a little more water if you want it livelier.');
+  if(c.texture==='webby')add('good','Good structure','A stretchy, webby texture shows strong gluten and plenty of gas.');
+  if(temp!=null&&temp>85)add('warn','Too warm: '+T(temp),`Above ${T(85)} bacteria outpace yeast, giving sour flavour and a fast collapse. Aim for ${T(75)}–${T(80)}.`);
+  if(c.amount!=null&&c.amount>250)add('info','That is a lot of starter',`About ${c.amount} g in the jar. Keep 30–50 g and discard the rest before feeding to save flour.`);
+  if(ratio!=null&&ratio<.8&&(c.rise==='fallen'||c.surface==='hooch'))add('info','The last feed was small',`You fed less flour than the starter you kept. Feed at least equal weights of starter, flour and water.`);
+  if(!isNew){const prev=st.log.filter(l=>l.type==='check'&&l.t<c.t).sort((a,b)=>b.t-a.t).slice(0,2);
+    const weak=x=>(x.rise==='none'||x.rise==='some')&&(x.hrs??9)>=6;
+    if(prev.length===2&&weak(c)&&prev.every(weak)&&place!=='fridge')add('warn','Three weak check-ins in a row',`Time for a reset: for three days, feed twice a day at 1:2:2 with a fifth of the flour as whole wheat or rye, kept at ${T(78)}.`)}
+  if(!tips.length)add('good','Looking fine','Nothing concerning in this check-in. Keep to your feeding routine.');
+  return tips}
+
+/* ---------- bake logic ---------- */
+const BULK=[[65,12],[68,10],[70,8.5],[72,7.5],[75,6],[78,5],[80,4.5],[82,4],[85,3.5]];
+const RISEPCT=[[65,100],[70,75],[75,50],[78,40],[80,30],[85,25]];
+const bTemp=b=>b.doughTemp??(b.equip.proofer?b.prooferTemp:b.roomTemp);
+function bulkMin(b){const r=recipe(b.recipeId),pct=r.starter/(r.flour+r.whole)*100;const k=Math.min(1.5,Math.max(.7,Math.sqrt(20/Math.max(5,pct))));return Math.round(interp(bTemp(b),BULK)*60*k/5)*5}
+const targetRise=b=>Math.round(interp(bTemp(b),RISEPCT)/5)*5;
+function steps(b){
+  const r=recipe(b.recipeId),n=b.loaves,e=b.equip,t=bTemp(b),g=x=>Math.round(x*n);
+  const st=starter(b.starterId),sn=st?esc(st.name):'your starter';
+  const need=g(r.starter)+30,seed=Math.ceil(need/5/5)*5,lev=interp(t,[[65,10],[70,8],[75,6],[78,5],[82,4]]);
+  const where=e.proofer?`in the proofer at ${T(b.prooferTemp)}`:`somewhere draft-free (your kitchen is about ${T(b.roomTemp)})`;
+  const hold=Math.round(g(r.water)*.07/5)*5,bm=bulkMin(b),tr=targetRise(b);
+  const out=[];
+  out.push({key:'levain',title:'Feed the starter',min:lev*60,body:[
+    `Feed ${sn}: ${seed} g starter + ${seed*2} g flour + ${seed*2} g water. You need ${g(r.starter)} g for the dough plus some to keep.`,
+    `Leave it ${where}. Expect a peak in ${hrsRange(lev)}.`,
+    `Ready when it has doubled and the top is domed and bubbly.`,
+    ...(e.proofer?[]:t<70?[`Your kitchen is cool, so this will be slow. Using warm water (about ${T(85)}) helps.`]:[])]});
+  if(r.autolyse>0)out.push({key:'autolyse',title:'Autolyse',min:r.autolyse,body:[
+    `Mix ${g(r.flour)} g bread flour${r.whole?` + ${g(r.whole)} g whole wheat`:''} with ${g(r.water)-hold} g water until no dry flour remains. Hold back ${hold} g water.`,
+    e.thermometer?`Use water at about ${T(Math.min(95,Math.max(70,t+(78-t)*1.5+8)))} to land the dough near ${T(78)}.`:`Use warm, not hot, water${t<70?' since the kitchen is cool':''}.`,
+    `Cover and rest ${r.autolyse} min.`]});
+  out.push({key:'mix',title:'Mix in starter and salt',min:0,body:[
+    `Add ${g(r.starter)} g ripe starter, ${g(r.salt)} g salt${r.autolyse>0?` and the reserved ${hold} g water`:`, ${g(r.flour)} g bread flour${r.whole?`, ${g(r.whole)} g whole wheat`:''} and ${g(r.water)} g water`}.`,
+    e.mixer?'Stand mixer with dough hook: 4–5 min on low until smooth and stretchy.':'By hand: pinch the dough through with wet fingers, then fold it over itself for about 5 min until it feels cohesive.',
+    ...(e.thermometer?[`Take the dough temperature and log it with “Dough check-in”. It sets the bulk timing.`]:[]),
+    `Bulk fermentation starts now: about ${dur(bm)} at ${T(t)}.`]});
+  for(let i=1;i<=r.folds;i++)out.push({key:'fold'+i,title:`Rest, then fold ${i} of ${r.folds}`,min:r.interval,body:[
+    `Rest ${r.interval} min ${e.proofer?'in the proofer':'covered'}.`,
+    `Then with a wet hand, stretch one side up and fold it over. Turn the bowl and repeat 4 times.`,
+    ...(i===r.folds?['The dough should now feel smoother and hold its shape longer.']:[])]});
+  out.push({key:'bulk',title:'Finish bulk fermentation',min:Math.max(15,bm-r.folds*r.interval),body:[
+    `Leave untouched ${where}. Total bulk is about ${dur(bm)} from mixing.`,
+    `Stop when the dough has risen about ${tr}%, the surface is domed with bubbles at the edge, and it jiggles when you shake the bowl.`,
+    e.proofer?'The proofer keeps this predictable, but still judge by the dough.':`With no proofer the time swings a lot with room temperature${t<70?'; in a cool kitchen expect the long end':''}. Trust the dough over the clock.`,
+    'Use “Dough check-in” for advice on what you see.']});
+  out.push({key:'preshape',title:'Preshape and bench rest',min:25,body:[
+    `Turn the dough onto an unfloured counter${n>1?` and divide into ${n}`:''}.`,
+    e.scraper?'Use the bench scraper to drag it into a loose round.':'With lightly floured hands, tuck the edges under to form a loose round.',
+    'Rest uncovered 20–30 min.']});
+  out.push({key:'shape',title:'Final shape',min:0,body:[
+    'Flour the top, flip, fold the sides in, then roll up tightly to build surface tension.',
+    e.banneton?'Place seam-side up in a floured banneton (rice flour sticks least).':'Place seam-side up in a bowl lined with a well-floured tea towel.']});
+  if(e.fridge)out.push({key:'proof',title:'Cold proof in the fridge',min:12*60,body:[
+    'Cover and refrigerate 8–16 h. Longer, up to 36 h, gives more sour flavour.',
+    'Bake straight from the fridge. Cold dough scores cleanly.',
+    'Start preheating the oven during the last hour.']});
+  else{const pm=interp(t,[[65,180],[70,150],[75,105],[78,90],[82,60]]);out.push({key:'proof',title:'Final proof',min:pm,body:[
+    `Cover and proof ${where} for about ${dur(pm)}.`,
+    'Poke test: a floured finger dent should spring back slowly and only part way. Fast spring-back means wait; no spring-back means bake now.',
+    'Without a cold proof the dough is soft, so score quickly and confidently.']})}
+  out.push({key:'preheat',title:'Preheat the oven',min:e.dutch?45:e.stone?50:30,body:
+    e.dutch?[`Put the Dutch oven with its lid inside and heat to ${T(500)} for 45 min.`]
+    :e.stone?[`Stone or steel on the middle rack, an empty metal pan on the bottom rack. Heat to ${T(500)} for 45–60 min.`]
+    :[`Put an upturned heavy baking tray on the middle rack and a metal pan on the bottom rack. Heat to ${T(475)} for 30 min.`]});
+  out.push({key:'bake1',title:'Score and bake with steam',min:20,body:[
+    `Turn the loaf onto parchment and score about 1 cm deep ${e.lame?'with the lame at a shallow angle':'with a very sharp serrated knife or scissors'}.`,
+    e.dutch?`Lower it into the Dutch oven, lid on. Drop the oven to ${T(450)} and bake 20 min.`:`Slide it onto the hot ${e.stone?'stone':'tray'}, pour a cup of boiling water into the bottom pan, and shut the door fast. Bake at ${T(450)} for 20 min.`]});
+  out.push({key:'bake2',title:'Finish the bake',min:22,body:[
+    e.dutch?'Remove the lid.':'Remove the steam pan carefully.',
+    'Bake 20–25 min more until deep golden brown.',
+    e.thermometer?`Done at ${T(205)}–${T(210)} in the centre.`:'Done when the base sounds hollow when tapped.']});
+  out.push({key:'cool',title:'Cool',min:90,body:['Cool on a rack at least 1–2 h. Cutting early makes the crumb gummy.','Then record how it turned out.']});
+  return out}
+
+const DRISE=[['0','Not noticeably'],['25','About 25%'],['50','About 50%'],['75','About 75%'],['100','Doubled or more']];
+const DSURF=[['flat','Flat'],['dome','Slightly domed'],['bubbly','Domed with bubbles'],['collapse','Bubbly and sinking']];
+const DFEEL=[['dense','Tight and dense'],['jiggly','Airy and jiggly'],['slack','Slack and sticky']];
+function doughTips(b,c){
+  const tips=[],add=(lv,t,x)=>tips.push({lv,t,b:x}),tr=targetRise(b),r=+c.rise,bm=bulkMin(b);
+  const start=b.done.mix,el=start?(c.t-start)/6e4:null;
+  if(c.temp!=null&&Math.abs(c.temp-c.planned)>=3)add('info',`Dough is ${T(c.temp)}, not ${T(c.planned)}`,`Bulk estimate updated to about ${dur(bm)} with a target rise near ${tr}%. ${c.temp<c.planned?(b.equip.proofer?'Check the proofer setting.':'A cool dough takes longer; be patient.'):'A warm dough moves fast; check it often.'}`);
+  if(c.surface==='collapse')add('bad','Overproofed','The dough is deflating. Shape it gently right away. Skip or shorten the final proof, or bake it in a loaf tin or as focaccia for support.');
+  else if(r>=tr+25)add('warn','Past the target','It has risen well beyond the target of about '+tr+'%. Shape now and '+(b.equip.fridge?'go straight into the fridge for a shorter proof (6–8 h).':'keep the final proof short, checking with the poke test from 30 min.'));
+  else if(r>=tr-10&&(c.surface==='bubbly'||c.surface==='dome'||c.feel==='jiggly'))add('good','Bulk is done','Rise is at the target of about '+tr+'% and the dough looks ready. Move on to preshape.');
+  else if(r>=tr-10)add('info','Nearly there','The rise is right but the dough still looks flat or tight. Give it another 20–30 min and look for a domed, jiggly surface.');
+  else{const left=el!=null?Math.max(20,bm-el):null;add('info','Keep going',`You are at about ${r}% and want about ${tr}%.`+(left?` Roughly ${dur(left)} more at this temperature.`:''));
+    if(el!=null&&el>bm*1.2)add('warn','Slower than expected',b.equip.proofer?'It is well past the estimate. The starter may have been past its peak, or the proofer is running cool.':'It is well past the estimate. The dough is probably cooler than you think, or the starter was not at its peak. Move it somewhere warmer.')}
+  if(c.feel==='slack'&&c.surface!=='collapse')add('info','Slack and sticky','Add one extra set of folds to build strength, and handle with wet hands. If this happens every time, lower the water by 20–25 g per loaf.');
+  if(c.feel==='dense'&&r<tr-10)add('info','Still tight','A dense feel means fermentation has more to do. That matches the low rise.');
+  return tips}
+
+const CRUMB=[['gummy','Dense and gummy'],['tunnels','Big holes, dense patches'],['tight','Tight but even'],['open','Open and even']];
+const SHAPE=[['flat','Flat, spread out'],['good','Good oven spring'],['blow','Burst at the side']];
+const CRUST=[['pale','Pale or soft'],['good','Golden and crisp'],['dark','Too dark or thick'],['burnt','Burnt bottom']];
+const FLAV=[['bland','Bland'],['balanced','Balanced'],['tangy','Nicely tangy'],['sour','Too sour']];
+function resultTips(b,o){
+  const tips=[],add=(lv,t,x)=>tips.push({lv,t,b:x}),e=b.equip,t=bTemp(b);
+  const under=o.crumb==='gummy'||o.crumb==='tunnels',over=o.shape==='flat'&&(o.crumb==='tight'||o.flavor==='sour');
+  if(under){add('warn','Underproofed','Dense, gummy crumb or large tunnels with tight patches means bulk fermentation ended too early. Next time extend bulk by 30–60 min, or go by a bigger rise.');
+    if(!e.proofer&&t<72)add('info','The cool kitchen held it back',`At ${T(t)} with no proofer, bulk can take 8 h or more. Use the proofer next time, or allow the extra time.`);
+    const st=starter(b.starterId),c=st&&st.log.filter(l=>l.type==='check'&&l.t<b.createdAt+D).sort((a,x)=>x.t-a.t)[0];
+    if(c&&(c.rise==='none'||c.rise==='some'||c.rise==='fallen'))add('info','Check the starter first',`${st.name} was not at its peak at its last check-in. Bake only when it doubles within 6 h of a feed.`)}
+  else if(over)add('warn','Overproofed','A flat loaf with tight crumb or strong sourness means it fermented too long. Shorten bulk by 30–45 min'+(e.fridge?' or the fridge proof by a few hours.':' or the final proof.'));
+  else if(o.shape==='flat')add('info','Spread without proofing faults','The crumb is fine, so this is about structure. Shape tighter, add a set of folds, or cut the water by 20–25 g per loaf.'+(e.banneton?'':' A banneton or snug bowl also helps it hold its shape.'));
+  if(o.shape==='blow')add('info','Burst at the side','The loaf found its own exit. Score deeper (about 1 cm) in one confident cut'+(e.lame?'':'; a razor or lame makes that much easier')+'. A slightly longer proof also calms this.');
+  if(o.crust==='pale')add('info','Pale crust',e.dutch?`Bake longer with the lid off, or start at ${T(475)}.`:`Without a Dutch oven you need more steam early and more heat: preheat longer and add more boiling water. If the loaf was also overproofed, the sugars were used up.`);
+  if(o.crust==='dark')add('info','Crust too dark',`Lower the oven by ${U()==='C'?'15°C':'25°F'} for the second half, or shorten it by 5 min.`);
+  if(o.crust==='burnt')add('info','Burnt bottom',e.dutch?'Slide a baking tray onto the rack below the Dutch oven, or lift the loaf onto the rack once the lid comes off.':'Move the loaf up a rack, or put a second tray underneath partway through.');
+  if(o.flavor==='bland')add('info','More flavour',e.fridge?'Extend the fridge proof to 16–24 h and swap in 10% more whole grain. Check the salt was weighed.':'An overnight fridge proof is the easiest way to add flavour. Also check the salt was weighed.');
+  if(o.flavor==='sour')add('info','Less sour',(e.fridge?'Shorten the fridge proof to 8 h. ':'')+'Use the starter slightly before its peak, and keep fermentation warm and short.');
+  if(o.crumb==='open'&&o.shape==='good')add('good','A well-fermented loaf','Open, even crumb with good spring. Repeat this timing and temperature.');
+  else if(o.crumb==='tight'&&o.shape==='good'&&!over)add('good','Good loaf','Even crumb and good spring. For a more open crumb, raise the water by 10–15 g and handle the dough gently when shaping.');
+  if(!tips.length)add('good','Nothing to fix','No faults reported. Keep the same process.');
+  return tips}
+
+/* ---------- views ---------- */
+const V={};
+const back=(href,label)=>`<div class="top"><a class="back" href="${href}">‹ ${label}</a></div>`;
+function starterCard(st){const s=stStatus(st),[h,hl]=health(st);
+  return `<a class="card" href="#/starter/${st.id}"><div class="row"><div class="grow"><h3>${esc(st.name)}</h3><div class="sub">${esc(s.line)}</div></div><span class="badge ${s.lv}">${s.label}</span></div><div class="sub" style="margin-top:6px">${st.mode==='new'?'New starter':st.storage==='fridge'?'Kept in the fridge':'Kept on the counter'} · <span class="badge ${hl}">${h}</span></div></a>`}
+function curStep(b){return steps(b).find(s=>!b.done[s.key])}
+function batchCard(b){const c=curStep(b),tm=b.timer;
+  return `<a class="card" href="#/bake/${b.id}"><div class="row"><div class="grow"><h3>${esc(b.name)}</h3><div class="sub">${b.status==='done'?'Baked '+when(b.finishedAt||b.createdAt)+(b.result?' · '+'★'.repeat(b.result.rating||0):' · add your results'):c?'Next: '+esc(c.title):'All steps done'}</div></div>${tm&&b.status!=='done'?`<span class="count" data-end="${tm.end}">${clock(tm.end-Date.now())}</span>`:''}</div></a>`}
+
+V.today=()=>{
+  const due=S.starters.filter(s=>stStatus(s).due),ok=S.starters.filter(s=>!stStatus(s).due),act=S.batches.filter(b=>b.status!=='done');
+  const noRes=S.batches.filter(b=>b.status==='done'&&!b.result).slice(0,2);
+  if(!S.starters.length&&!S.batches.length)return `<h1>Crumb</h1><p class="sub">Your sourdough starters and bakes, kept on this device.</p><div class="card empty"><p>Start by adding a starter. The app will tell you when to feed it and what its behaviour means.</p><a class="btn pri full" href="#/starter/new">Add a starter</a></div>`;
+  return `<h1>Today</h1><p class="sub">${new Date().toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'})}</p>
+  ${memOnly?'<div class="tip warn"><b>Storage is unavailable</b><p>This browser is blocking device storage, so nothing will be saved after you close the app.</p></div>':''}
+  <h2>Needs attention</h2>${due.length?due.map(st=>{const s=stStatus(st);return `<div class="card"><div class="row"><div class="grow"><h3>${esc(st.name)}</h3><div class="sub">${esc(s.line)}</div></div><span class="badge ${s.lv}">${s.label}</span></div><div class="btns"><a class="btn pri" href="#/starter/${st.id}/${s.act==='stir'?'stir':'feed'}" ${s.act==='stir'?`data-act="stir" data-id="${st.id}"`:''}>${s.act==='stir'?'Mark stirred':'Feed'}</a><a class="btn" href="#/starter/${st.id}/check">Check-in</a></div></div>`}).join(''):'<div class="card sub">Nothing is due. All starters are fed.</div>'}
+  ${act.length?'<h2>Bakes in progress</h2>'+act.map(batchCard).join(''):''}
+  ${noRes.length?'<h2>How did it turn out?</h2>'+noRes.map(batchCard).join(''):''}
+  ${ok.length?'<h2>All good</h2>'+ok.map(starterCard).join(''):''}
+  <div class="btns"><a class="btn" href="#/bake/new">Start a bake</a><a class="btn" href="#/starter/new">Add a starter</a></div>`};
+
+V.starters=()=>`<h1>Starters</h1>${S.starters.length?S.starters.map(starterCard).join(''):'<div class="card empty">No starters yet.</div>'}<a class="btn pri full" href="#/starter/new">Add a starter</a>`;
+
+function starterForm(st){const n=!st;st=st||{name:'',flour:'Whole wheat',mode:'established',storage:'counter',startDate:Date.now(),notes:''};
+  return `${back(n?'#/starters':'#/starter/'+st.id,'Back')}<h1>${n?'Add a starter':'Edit starter'}</h1>
+  <form data-form="starter" data-id="${st.id||''}">
+  <label class="f">Name</label><input type="text" name="name" required maxlength="40" value="${esc(st.name)}" placeholder="e.g. Doughy Parton">
+  <label class="f">Stage</label>${chips('mode',[['new','Starting from scratch'],['established','Already active']],st.mode,true)}
+  <label class="f">Day 1 date <span class="hint">only for a starter made from scratch</span></label><input type="date" name="startDate" value="${localInput(st.startDate).slice(0,10)}">
+  <label class="f">Where it lives <span class="hint">sets the feeding schedule once established</span></label>${chips('storage',[['counter','Counter, fed daily'],['fridge','Fridge, fed every 3–5 days']],st.storage,true)}
+  <label class="f">Flour</label><input type="text" name="flour" maxlength="40" value="${esc(st.flour)}">
+  <label class="f">Notes</label><textarea name="notes" maxlength="500">${esc(st.notes)}</textarea>
+  <div class="btns"><button class="btn pri">Save</button></div></form>
+  ${n?'':`<div class="btns"><button class="btn danger" data-act="delStarter" data-id="${st.id}">Delete this starter</button></div>`}`}
+V.starterNew=()=>starterForm();
+V.starterEdit=id=>starterForm(starter(id));
+
+V.starter=id=>{const st=starter(id);if(!st)return V.starters();
+  const s=stStatus(st),[h,hl]=health(st),c=lastOf(st,'check'),lf=lastOf(st,'feed');
+  const log=[...st.log].sort((a,b)=>b.t-a.t).slice(0,40);
+  const desc=l=>l.type==='feed'?`<b>Fed</b> ${l.discard?`discarded ${l.discard} g, `:''}${l.flour} g flour + ${l.water} g water${l.kept?` (kept ${l.kept} g)`:''} · ${lab(PLACE,l.place)}${l.temp!=null?' '+T(l.temp):''}`
+    :l.type==='stir'?'<b>Stirred</b>':`<b>Check-in</b> ${[lab(RISE,l.rise),lab(SMELL,l.smell),lab(SURFACE,l.surface)!=='Normal'?lab(SURFACE,l.surface):''].filter(Boolean).join(', ')}${l.hrs!=null?` · ${l.hrs.toFixed(1)} h after feeding`:''}${l.notes?'<br>'+esc(l.notes):''}`;
+  return `${back('#/starters','Starters')}<div class="row"><h1>${esc(st.name)}</h1><a class="btn sm" href="#/starter/${id}/edit">Edit</a></div>
+  <p><span class="badge ${s.lv}">${s.label}</span> <span class="badge ${hl}">${h}</span></p>
+  <div class="card"><dl class="kv">
+    <dt>${st.mode==='new'?'Stage':'Lives'}</dt><dd>${st.mode==='new'?'Day '+s.day+' of building':st.storage==='fridge'?'In the fridge':'On the counter'}</dd>
+    <dt>Flour</dt><dd>${esc(st.flour||'–')}</dd>
+    <dt>Last fed</dt><dd>${lf?ago(lf.t):'never'}</dd>
+    ${st.mode==='new'?`<dt>Today</dt><dd>${esc(s.line.split(' · ')[1])}</dd>`:`<dt>Next</dt><dd>${esc(s.line.split(' · ')[1]||'')}</dd>`}
+  </dl>${st.notes?`<p class="sub">${esc(st.notes)}</p>`:''}
+  <div class="btns">${s.act==='stir'&&s.due?`<button class="btn pri" data-act="stir" data-id="${id}">Mark stirred</button>`:`<a class="btn pri" href="#/starter/${id}/feed">Feed</a>`}<a class="btn" href="#/starter/${id}/check">Check-in</a></div>
+  ${st.mode==='new'&&s.day>=7?`<div class="btns"><button class="btn" data-act="graduate" data-id="${id}">Mark as established</button></div><p class="sub">Do this once it doubles within 6 hours of a feed.</p>`:''}</div>
+  ${c?`<h2>Guidance from ${when(c.t)}</h2>${tipsHtml(c.tips)}`:`<h2>Guidance</h2><div class="card sub">Do a check-in a few hours after feeding and you will get advice based on what you see.</div>`}
+  <h2>History</h2><div class="card">${log.length?log.map(l=>`<div class="log row"><div class="grow"><div class="sub">${when(l.t)}</div>${desc(l)}</div><button class="x" aria-label="Delete entry" data-act="delLog" data-id="${id}" data-log="${l.id}">×</button></div>`).join(''):'<span class="sub">Nothing logged yet.</span>'}</div>`};
+
+V.feed=id=>{const st=starter(id);if(!st)return V.starters();const s=stStatus(st),lf=lastOf(st,'feed');
+  let d={discard:'',kept:50,flour:50,water:50};
+  if(st.mode==='new')d=s.day<=1&&!lf?{discard:0,kept:0,flour:60,water:80}:{discard:100,kept:'',flour:50,water:50};
+  else if(lf)d={discard:lf.discard??'',kept:lf.kept??'',flour:lf.flour,water:lf.water};
+  const place=st.storage==='fridge'&&st.mode!=='new'?'counter':(lf?.place&&lf.place!=='fridge'?lf.place:S.settings.equip.proofer?'proofer':'counter');
+  return `${back('#/starter/'+id,esc(st.name))}<h1>Feed</h1>
+  ${st.mode==='new'?`<div class="tip"><b>Day ${s.day}</b><p>${esc(s.task)}. Stir well, cover with the cloth and mark the level with the rubber band.</p></div>`:st.storage==='fridge'?'<div class="tip"><b>Fridge routine</b><p>Feed, leave it out for about 2 hours, then put it back in the fridge with the lid on.</p></div>':''}
+  <form data-form="feed" data-id="${id}">
+  <details class="card" ${st.mode==='new'?'':'open'}><summary><b>Feeding calculator</b></summary>
+  <p class="sub">Pick a ratio and the amounts below fill in for you. Ratio is starter : flour : water by weight.</p>
+  ${chips('ratio',[['1','1:1:1'],['2','1:2:2'],['3','1:3:3'],['5','1:5:5']])}
+  <label class="f">Total starter I want after feeding (g) <span class="hint">optional, e.g. what a recipe needs plus 30 g to keep</span></label><input type="number" inputmode="decimal" step="any" min="0" name="target">
+  <div class="grid2"><div><label class="f">Jar + starter now (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="jarTotal"></div>
+  <div><label class="f">Empty jar (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="tare" value="${st.jarTare??''}"></div></div>
+  <p class="sub">Weigh the jar as it is and the app works out how much to discard. The empty jar weight is remembered.</p></details>
+  <div class="grid2"><div><label class="f">Discarded (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="discard" value="${d.discard}"></div>
+  <div><label class="f">Starter kept (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="kept" value="${d.kept}"></div>
+  <div><label class="f">Flour (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="flour" required value="${d.flour}"></div>
+  <div><label class="f">Water (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="water" required value="${d.water}"></div></div>
+  <p class="sub" id="ratio"></p>
+  <label class="f">Where it is resting now</label>${chips('place',PLACE,place,true)}
+  ${tempField('temp','Temperature there',place==='proofer'?S.settings.prooferTemp:lf?.temp,'optional')}
+  <label class="f">When</label><input type="datetime-local" name="t" value="${localInput(Date.now())}">
+  <div class="btns"><button class="btn pri">Save feeding</button></div></form>`};
+
+V.check=id=>{const st=starter(id);if(!st)return V.starters();const lf=lastOf(st,'feed');
+  return `${back('#/starter/'+id,esc(st.name))}<h1>Check-in</h1><p class="sub">${lf?`Last fed ${ago(lf.t)}.`:'No feed logged yet.'} Tap what you see. Only the rise is required.</p>
+  <form data-form="check" data-id="${id}">
+  <label class="f">Rise since feeding</label>${chips('rise',RISE,null,true)}
+  <label class="f">Bubbles</label>${chips('bubbles',BUBBLES)}
+  <label class="f">Smell</label>${chips('smell',SMELL)}
+  <label class="f">Texture when stirred</label>${chips('texture',TEXTURE)}
+  <label class="f">Surface</label>${chips('surface',SURFACE,'normal')}
+  <div class="grid2"><div>${tempField('temp','Temperature','', '')}</div>
+  <div><label class="f">Starter in jar (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="amount"></div></div>
+  <label class="f">Notes</label><textarea name="notes" maxlength="500"></textarea>
+  <label class="f">When</label><input type="datetime-local" name="t" value="${localInput(Date.now())}">
+  <div class="btns"><button class="btn pri">Get guidance</button></div></form>`};
+
+V.bakes=()=>{const a=S.batches.filter(b=>b.status!=='done'),d=S.batches.filter(b=>b.status==='done').sort((x,y)=>y.createdAt-x.createdAt);
+  return `<h1>Bakes</h1><a class="btn pri full" href="#/bake/new">Start a bake</a>
+  ${a.length?'<h2>In progress</h2>'+a.map(batchCard).join(''):''}
+  ${d.length?'<h2>Finished</h2>'+d.map(batchCard).join(''):''}
+  ${!S.batches.length?'<div class="card empty">No bakes yet. Each bake walks you through the steps with timers, adjusted for the tools you are using.</div>':''}
+  <h2>Recipes</h2><div class="card"><div class="row"><div><b>${CLASSIC.name}</b><div class="sub">Built in · ${CLASSIC.notes}</div></div></div></div>
+  ${S.recipes.map(r=>`<a class="card" href="#/recipe/${r.id}"><b>${esc(r.name)}</b><div class="sub">${r.flour+r.whole} g flour · ${Math.round(r.water/(r.flour+r.whole)*100)}% hydration · ${r.starter} g starter</div></a>`).join('')}
+  <a class="btn full" href="#/recipe/new">Add my own recipe</a>`};
+
+V.bakeNew=()=>{const eq=S.settings.equip,last=S.batches.filter(b=>b.result).sort((a,b)=>b.createdAt-a.createdAt)[0];
+  const lessons=last?last.result.tips.filter(t=>t.lv!=='good'):[];
+  return `${back('#/bakes','Bakes')}<h1>Start a bake</h1>
+  ${lessons.length?`<div class="tip"><b>From your last bake (${esc(last.name)})</b><p>${lessons.map(t=>esc(t.t)).join(' · ')}. Open it from Bakes for the details.</p></div>`:''}
+  <form data-form="bake">
+  <label class="f">Name</label><input type="text" name="name" maxlength="40" required value="Loaf ${new Date().toLocaleDateString([], {month:'short',day:'numeric'})}">
+  <label class="f">Starter</label><select name="starterId">${S.starters.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}<option value="">Not tracked here</option></select>
+  <label class="f">Recipe</label><select name="recipeId"><option value="classic">${CLASSIC.name}</option>${S.recipes.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
+  <label class="f">Loaves</label>${chips('loaves',[['1','1'],['2','2'],['3','3'],['4','4']],'1',true)}
+  <h2>What are you using this time?</h2><div class="card">${EQUIP.map(([k,l,h])=>`<label class="check"><input type="checkbox" name="eq_${k}" ${eq[k]?'checked':''}><span><b>${l}</b><br><span class="hint">${h}</span></span></label>`).join('')}</div>
+  <div class="grid2"><div>${tempField('roomTemp','Kitchen temp',72,'')}</div><div>${tempField('prooferTemp','Proofer setting',S.settings.prooferTemp,'')}</div></div>
+  <p class="sub">The proofer setting is used when the proofer is ticked. Otherwise timings follow your kitchen temperature.</p>
+  <div class="btns"><button class="btn pri">Build my plan</button></div></form>`};
+
+V.bake=id=>{const b=batch(id);if(!b)return V.bakes();const ss=steps(b),cur=ss.find(s=>!b.done[s.key]),r=recipe(b.recipeId),now=Date.now();
+  const using=EQUIP.filter(e=>b.equip[e[0]]).map(e=>e[1]),not=EQUIP.filter(e=>!b.equip[e[0]]).map(e=>e[1]);
+  const inBulk=b.done.mix&&!b.done.bulk,lastC=b.checks[b.checks.length-1];
+  return `${back('#/bakes','Bakes')}<h1>${esc(b.name)}</h1>
+  <p class="sub">${esc(r.name)} · ${b.loaves} ${b.loaves>1?'loaves':'loaf'} · ${b.equip.proofer?'proofer at '+T(b.prooferTemp):'kitchen at '+T(b.roomTemp)}${b.doughTemp!=null?' · dough '+T(b.doughTemp):''}</p>
+  <details class="card"><summary><b>Tools for this bake</b></summary><p class="sub">Using: ${using.join(', ')||'none'}</p>${not.length?`<p class="sub">Not using: ${not.join(', ')}. The steps below are adjusted for that.</p>`:''}</details>
+  ${inBulk?`<div class="card"><div class="row"><div><b>Bulk clock</b><div class="sub">about ${dur(bulkMin(b))} planned · target rise ${targetRise(b)}%</div></div><span class="count" data-since="${b.done.mix}"></span></div><div class="btns"><a class="btn" href="#/bake/${id}/check">Dough check-in</a></div>${lastC?tipsHtml(lastC.tips):''}</div>`:''}
+  ${b.result?`<h2>How it turned out ${'★'.repeat(b.result.rating||0)}</h2>${tipsHtml(b.result.tips)}${b.result.notes?`<p class="sub">${esc(b.result.notes)}</p>`:''}<div class="btns"><a class="btn" href="#/bake/${id}/result">Edit results</a></div>`:b.status==='done'?`<a class="btn pri full" href="#/bake/${id}/result">Record how it turned out</a>`:''}
+  <h2>Steps</h2>${ss.map((s,i)=>{const dn=b.done[s.key],isCur=cur&&cur.key===s.key,tm=b.timer&&b.timer.key===s.key?b.timer:null;
+    return `<div class="step ${dn?'done':''} ${isCur?'cur':''}"><div class="row"><div class="row" style="justify-content:flex-start;gap:0"><span class="num">${dn?'✓':i+1}</span><b>${s.title}</b></div>${s.min?`<span class="sub">${dur(s.min)}</span>`:''}</div>
+    ${isCur?`<ul>${s.body.map(x=>`<li>${x}</li>`).join('')}</ul>
+      ${tm?`<div class="row"><span class="count" data-end="${tm.end}">${clock(tm.end-now)}</span><button class="btn sm" data-act="timerStop" data-id="${id}">Cancel timer</button></div>`:s.min?`<div class="btns"><button class="btn" data-act="timer" data-id="${id}" data-key="${s.key}" data-min="${Math.round(s.min)}">Start ${dur(s.min)} timer</button><button class="btn sm" style="flex:0" data-act="timerCustom" data-id="${id}" data-key="${s.key}" data-min="${Math.round(s.min)}">Other</button></div>`:''}
+      <div class="btns"><button class="btn pri" data-act="stepDone" data-id="${id}" data-key="${s.key}">Done, next step</button></div>`:''}
+    ${dn?`<div class="sub">Done ${when(dn)}</div>`:''}</div>`}).join('')}
+  <div class="btns">${Object.keys(b.done).length?`<button class="btn sm" data-act="stepUndo" data-id="${id}">Undo last step</button>`:''}<button class="btn sm danger" data-act="delBake" data-id="${id}">Delete bake</button></div>`};
+
+V.bakeCheck=id=>{const b=batch(id);if(!b)return V.bakes();
+  return `${back('#/bake/'+id,esc(b.name))}<h1>Dough check-in</h1><p class="sub">Target for this dough is a rise of about ${targetRise(b)}%.</p>
+  <form data-form="doughCheck" data-id="${id}">
+  <label class="f">How much has it risen?</label>${chips('rise',DRISE,null,true)}
+  <label class="f">Surface</label>${chips('surface',DSURF)}
+  <label class="f">Feel when you shake the bowl</label>${chips('feel',DFEEL)}
+  ${b.equip.thermometer?tempField('temp','Dough temperature',b.doughTemp,'updates the timing'):'<p class="sub">No thermometer on this bake, so timing follows the '+(b.equip.proofer?'proofer setting':'kitchen temperature')+'.</p>'}
+  <div class="btns"><button class="btn pri">Get guidance</button></div></form>`};
+
+V.bakeResult=id=>{const b=batch(id);if(!b)return V.bakes();const o=b.result||{};
+  return `${back('#/bake/'+id,esc(b.name))}<h1>How did it turn out?</h1>
+  <form data-form="result" data-id="${id}">
+  <label class="f">Crumb</label>${chips('crumb',CRUMB,o.crumb,true)}
+  <label class="f">Shape</label>${chips('shape',SHAPE,o.shape,true)}
+  <label class="f">Crust</label>${chips('crust',CRUST,o.crust)}
+  <label class="f">Flavour</label>${chips('flavor',FLAV,o.flavor)}
+  <label class="f">Rating</label>${chips('rating',[1,2,3,4,5].map(n=>[String(n),'★'.repeat(n)]),o.rating?String(o.rating):null)}
+  <label class="f">Notes</label><textarea name="notes" maxlength="500">${esc(o.notes||'')}</textarea>
+  <div class="btns"><button class="btn pri">Save and get advice</button></div></form>`};
+
+V.recipe=id=>{const r=S.recipes.find(x=>x.id===id)||{name:'',flour:450,whole:50,water:375,starter:100,salt:10,folds:4,interval:30,autolyse:45,notes:''};
+  const f=(n,l,v,x='')=>`<div><label class="f">${l}</label><input type="number" inputmode="decimal" step="any" min="0" name="${n}" required value="${v}" ${x}></div>`;
+  return `${back('#/bakes','Bakes')}<h1>${r.id?'Edit recipe':'My recipe'}</h1><p class="sub">Amounts are for one loaf. The app scales them and builds the steps and timings.</p>
+  <form data-form="recipe" data-id="${r.id||''}">
+  <label class="f">Name</label><input type="text" name="name" required maxlength="40" value="${esc(r.name)}">
+  <div class="grid2">${f('flour','Bread flour (g)',r.flour)}${f('whole','Whole grain flour (g)',r.whole)}${f('water','Water (g)',r.water)}${f('starter','Starter (g)',r.starter)}${f('salt','Salt (g)',r.salt)}${f('autolyse','Autolyse (min)',r.autolyse)}${f('folds','Sets of folds',r.folds,'max="8" step="1"')}${f('interval','Minutes between folds',r.interval,'min="10"')}</div>
+  <label class="f">Notes</label><textarea name="notes" maxlength="500">${esc(r.notes)}</textarea>
+  <div class="btns"><button class="btn pri">Save recipe</button></div></form>
+  ${r.id?`<div class="btns"><button class="btn danger" data-act="delRecipe" data-id="${r.id}">Delete recipe</button></div>`:''}`};
+
+V.more=()=>{const eq=S.settings.equip,np=('Notification'in window)?Notification.permission:'unsupported';
+  return `<h1>More</h1><a class="card" href="#/guide"><b>Starter guide and troubleshooting</b><div class="sub">The day-by-day method, readiness signs and common problems</div></a>
+  <h2>Settings</h2><form data-form="settings"><div class="card">
+  <label class="f" style="margin-top:0">Temperature unit</label>${chips('unit',[['F','Fahrenheit'],['C','Celsius']],U(),true)}
+  ${tempField('prooferTemp','Usual proofer setting',S.settings.prooferTemp,'')}
+  <label class="f">Tools I normally use <span class="hint">pre-ticked for each new bake</span></label>
+  ${EQUIP.map(([k,l])=>`<label class="check"><input type="checkbox" name="eq_${k}" ${eq[k]?'checked':''}><span>${l}</span></label>`).join('')}
+  <div class="btns"><button class="btn pri">Save settings</button></div></div></form>
+  <h2>Timer alerts</h2><div class="card"><p class="sub">Timers beep and vibrate while the app is open. Allowing notifications also shows an alert when the app is in the background. ${np==='granted'?'Notifications are on.':np==='denied'?'Notifications are blocked in your browser settings.':np==='unsupported'?'This browser does not support notifications.':''}</p>${np==='default'?'<button class="btn full" data-act="notify">Allow notifications</button>':''}<div class="btns"><button class="btn" data-act="beepTest">Test the sound</button></div></div>
+  <h2>Your data</h2><div class="card"><p class="sub">Everything is stored only on this device. Clearing your browser data erases it, so export a backup now and then.</p><div class="btns"><button class="btn" data-act="export">Export backup</button><label class="btn">Import backup<input type="file" accept="application/json,.json" id="imp" hidden></label></div><div class="btns"><button class="btn danger" data-act="wipe">Erase everything</button></div></div>`};
+
+V.guide=()=>`${back('#/more','More')}<h1>Starter guide</h1>
+<h2>Building a starter (7–12 days)</h2><div class="card"><p>Keep it at ${T(75)}–${T(80)} and feed at about the same time each day.</p>
+<p><b>Day 1.</b> 80 g water + 60 g whole wheat flour. Stir, cover with a cloth, leave on the counter.</p>
+<p><b>Day 2.</b> Stir, cover, leave another 24 h. Tiny bubbles are a good sign.</p>
+<p><b>Days 3–7 and on.</b> Stir, discard 100 g, add 50 g water then 50 g whole wheat flour, cover. Mark the level with a rubber band.</p>
+<p>Expect it to rise 8–12 h after feeding, then fall before the next feed.</p></div>
+<h2>Ready to bake</h2><div class="card"><p>It is ready when it <b>doubles within 6 hours</b> of a feed. Use it at or just before the peak: domed top, lots of bubbles, pleasant tangy smell.</p></div>
+<h2>Keeping it going</h2><div class="card"><p><b>Baking most days:</b> keep it on the counter and feed once a day.</p><p><b>Baking less often:</b> feed, wait about 2 hours, then refrigerate with the lid on. Feed every 3–5 days. Give it one or two counter feeds before baking.</p></div>
+<h2>Troubleshooting</h2>
+<div class="tip"><b>Flat for days around day 4–10</b><p>Normal. Early activity is bacteria; yeast takes longer. Keep feeding and keep it warm.</p></div>
+<div class="tip warn"><b>Liquid on top (hooch)</b><p>Hungry. Pour off or stir in, then feed. Feed more often or at a higher ratio.</p></div>
+<div class="tip warn"><b>Nail polish or alcohol smell</b><p>Hungry. Feed now and more often for a few days.</p></div>
+<div class="tip warn"><b>Slow to rise</b><p>Usually temperature. Warm it to ${T(75)}–${T(80)}, feed a little thicker, add some whole grain, and avoid heavily chlorinated water.</p></div>
+<div class="tip"><b>Rises and collapses before the next feed</b><p>It is eating fast. Feed 1:3:3 or 1:5:5, or keep it a little cooler.</p></div>
+<div class="tip bad"><b>Pink, orange or fuzzy growth</b><p>Contaminated. Throw it out and clean the jar thoroughly.</p></div>
+<h2>Feeding ratios</h2><div class="card"><p>Ratios are starter : flour : water by weight. <b>1:1:1</b> peaks in roughly 4–6 h when warm. <b>1:2:2</b> takes 6–8 h. <b>1:5:5</b> takes 10–12 h, good for overnight.</p></div>`;
+
+/* ---------- router ---------- */
+const ICON={today:'<path d="M4 11l8-7 8 7v9H4z"/>',starters:'<path d="M8 3h8M7 7h10v12a2 2 0 01-2 2H9a2 2 0 01-2-2zM7 13h10"/>',bakes:'<path d="M3 13a9 6 0 0118 0v5H3zM8 10l1 3M12 9v4M16 10l-1 3"/>',more:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'};
+function render(){
+  const p=(location.hash.replace(/^#\/?/,'')||'today').split('/');let html,tab=p[0];
+  if(p[0]==='starter'){tab='starters';html=p[1]==='new'?V.starterNew():p[2]==='feed'?V.feed(p[1]):p[2]==='check'?V.check(p[1]):p[2]==='edit'?V.starterEdit(p[1]):V.starter(p[1])}
+  else if(p[0]==='bake'){tab='bakes';html=p[1]==='new'?V.bakeNew():p[2]==='check'?V.bakeCheck(p[1]):p[2]==='result'?V.bakeResult(p[1]):V.bake(p[1])}
+  else if(p[0]==='recipe'){tab='bakes';html=V.recipe(p[1])}
+  else if(p[0]==='guide'){tab='more';html=V.guide()}
+  else html=(V[p[0]]||V.today)();
+  if(!V[tab])tab='today';
+  document.getElementById('app').innerHTML=html;
+  document.getElementById('nav').innerHTML=[['today','Today'],['starters','Starters'],['bakes','Bakes'],['more','More']].map(([k,l])=>`<a href="#/${k}" class="${k===tab?'on':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>${l}</a>`).join('');
+  ratio();tick()}
+let lastHash='';
+window.addEventListener('hashchange',()=>{render();if(location.hash!==lastHash)window.scrollTo(0,0);lastHash=location.hash});
+function go(h){if(location.hash===h)render();else location.hash=h}
+function ratio(){const f=document.querySelector('form[data-form=feed]'),el=document.getElementById('ratio');if(!f||!el)return;
+  const k=num(f.kept.value),fl=num(f.flour.value),w=num(f.water.value);
+  if(!(fl&&w)){el.textContent='';return}
+  const r1=x=>(x/k).toFixed(1).replace('.0',''),tp=toF(num(f.temp.value)),pl=f.place.value;
+  let txt=k?`Ratio 1:${r1(fl)}:${r1(w)} (starter : flour : water) · ${Math.round(w/fl*100)}% hydration · ${Math.round(k+fl+w)} g in the jar after feeding.`:`${Math.round(w/fl*100)}% hydration. Enter the starter kept to see the ratio.`;
+  if(k&&pl!=='fridge'){const base=interp(fl/k,[[.5,4],[1,5],[2,7],[3,9],[5,11],[10,14]])*interp(tp??75,BULK)/5;txt+=` Expect a peak in roughly ${hrsRange(base)}${tp!=null?' at '+T(tp):' at room temperature'}.`}
+  el.textContent=txt}
+function feedMath(e){const f=e.target.form,n=e.target.name;if(!f||f.dataset.form!=='feed')return;
+  const set=(k,v)=>{f[k].value=Math.round(v)};
+  let r=num(f.ratio.value);const tg=num(f.target.value);
+  if(n==='target'&&tg&&!r){r=1;f.querySelector('input[name=ratio][value="1"]').checked=true}
+  if(r&&(n==='ratio'||n==='target'||n==='kept')){
+    if(tg&&n!=='kept')set('kept',tg/(1+2*r));
+    const k=num(f.kept.value);if(k){set('flour',k*r);set('water',k*r)}}
+  const jt=num(f.jarTotal.value),k=num(f.kept.value);
+  if(jt!=null&&k!=null&&['jarTotal','tare','kept','ratio','target'].includes(n)){const d=jt-(num(f.tare.value)||0)-k;if(d>=0)set('discard',d)}
+  ratio()}
+document.addEventListener('input',feedMath);
+
+/* ---------- forms ---------- */
+const FORMS={
+  starter(f,id){let st=starter(id);const isNew=!st;if(isNew){st={id:uid(),log:[],createdAt:Date.now()};S.starters.push(st)}
+    Object.assign(st,{name:f.name.trim(),mode:f.mode,storage:f.storage,flour:f.flour.trim(),notes:f.notes.trim(),startDate:f.startDate?new Date(f.startDate+'T12:00').getTime():Date.now()});
+    return'#/starter/'+st.id},
+  feed(f,id){const st=starter(id);if(num(f.tare)!=null)st.jarTare=num(f.tare);st.log.push({id:uid(),type:'feed',t:f.t?new Date(f.t).getTime():Date.now(),discard:num(f.discard),kept:num(f.kept),flour:num(f.flour),water:num(f.water),place:f.place,temp:toF(num(f.temp))});
+    toast('Feeding saved');return'#/starter/'+id},
+  check(f,id){const st=starter(id),t=f.t?new Date(f.t).getTime():Date.now(),lf=st.log.filter(l=>l.type==='feed'&&l.t<=t).sort((a,b)=>b.t-a.t)[0];
+    const c={id:uid(),type:'check',t,rise:f.rise,bubbles:f.bubbles,smell:f.smell,texture:f.texture,surface:f.surface||'normal',temp:toF(num(f.temp)),amount:num(f.amount),notes:(f.notes||'').trim(),hrs:lf?(t-lf.t)/H:null};
+    c.tips=starterTips(st,c);st.log.push(c);return'#/starter/'+id},
+  bake(f){const equip=Object.fromEntries(EQUIP.map(e=>[e[0],'eq_'+e[0] in f]));
+    const b={id:uid(),name:f.name.trim(),starterId:f.starterId,recipeId:f.recipeId,loaves:+f.loaves,equip,roomTemp:toF(num(f.roomTemp))??72,prooferTemp:toF(num(f.prooferTemp))??78,doughTemp:null,createdAt:Date.now(),done:{},timer:null,checks:[],status:'active',result:null};
+    S.batches.push(b);return'#/bake/'+b.id},
+  doughCheck(f,id){const b=batch(id),planned=bTemp(b),temp=toF(num(f.temp));if(temp!=null)b.doughTemp=temp;
+    const c={t:Date.now(),rise:f.rise,surface:f.surface,feel:f.feel,temp,planned};c.tips=doughTips(b,c);b.checks.push(c);return'#/bake/'+id},
+  result(f,id){const b=batch(id),o={crumb:f.crumb,shape:f.shape,crust:f.crust,flavor:f.flavor,rating:num(f.rating),notes:(f.notes||'').trim()};o.tips=resultTips(b,o);b.result=o;
+    if(b.status!=='done'){b.status='done';b.finishedAt=Date.now();b.timer=null}return'#/bake/'+id},
+  recipe(f,id){let r=S.recipes.find(x=>x.id===id);if(!r){r={id:uid()};S.recipes.push(r)}
+    Object.assign(r,{name:f.name.trim(),flour:+f.flour,whole:+f.whole,water:+f.water,starter:+f.starter,salt:+f.salt,autolyse:+f.autolyse,folds:Math.min(8,Math.round(+f.folds)),interval:Math.max(10,+f.interval),notes:(f.notes||'').trim()});
+    if(r.flour+r.whole<=0){alert('Enter the flour weight.');S.recipes=S.recipes.filter(x=>x.flour+x.whole>0);return null}
+    return'#/bakes'},
+  settings(f){const old=S.settings.prooferTemp;S.settings.unit=f.unit;S.settings.prooferTemp=toF(num(f.prooferTemp))??old;S.settings.equip=Object.fromEntries(EQUIP.map(e=>[e[0],'eq_'+e[0] in f]));toast('Settings saved');return'#/more'},
+};
+document.addEventListener('submit',e=>{const fm=e.target.closest('form[data-form]');if(!fm)return;e.preventDefault();
+  const dest=FORMS[fm.dataset.form](Object.fromEntries(new FormData(fm)),fm.dataset.id);if(dest){save();go(dest)}});
+
+/* ---------- actions ---------- */
+const ACT={
+  stir(d){starter(d.id).log.push({id:uid(),type:'stir',t:Date.now()});toast('Marked as stirred')},
+  graduate(d){const st=starter(d.id);if(confirm('Move '+st.name+' to maintenance feeding?')){st.mode='established'}},
+  delLog(d){if(confirm('Delete this entry?')){const st=starter(d.id);st.log=st.log.filter(l=>l.id!==d.log)}},
+  delStarter(d){if(confirm('Delete this starter and its whole history?')){S.starters=S.starters.filter(s=>s.id!==d.id);return'#/starters'}},
+  delBake(d){if(confirm('Delete this bake?')){S.batches=S.batches.filter(b=>b.id!==d.id);return'#/bakes'}},
+  delRecipe(d){if(confirm('Delete this recipe?')){S.recipes=S.recipes.filter(r=>r.id!==d.id);return'#/bakes'}},
+  timer(d){batch(d.id).timer={key:d.key,end:Date.now()+d.min*6e4,fired:false};audio()},
+  timerCustom(d){const m=num(prompt('Timer length in minutes',d.min));if(m>0){batch(d.id).timer={key:d.key,end:Date.now()+m*6e4,fired:false};audio()}},
+  timerStop(d){batch(d.id).timer=null},
+  stepDone(d){const b=batch(d.id);b.done[d.key]=Date.now();if(b.timer&&b.timer.key===d.key)b.timer=null;
+    if(!curStep(b)){b.status='done';b.finishedAt=Date.now();return'#/bake/'+b.id+'/result'}},
+  stepUndo(d){const b=batch(d.id),k=Object.keys(b.done).sort((a,c)=>b.done[c]-b.done[a])[0];if(k){delete b.done[k];b.status='active'}},
+  notify(){Notification.requestPermission().then(render)},
+  beepTest(){beep()},
+  export(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='crumb-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()},
+  wipe(){if(confirm('Erase all starters, bakes and recipes from this device? This cannot be undone.')){S=fresh();return'#/today'}},
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;e.preventDefault();
+  const dest=ACT[el.dataset.act](el.dataset);save();if(dest)go(dest);else render()});
+document.addEventListener('change',e=>{if(e.target.id!=='imp'||!e.target.files[0])return;
+  e.target.files[0].text().then(tx=>{const d=JSON.parse(tx);if(!d||!Array.isArray(d.starters)||!Array.isArray(d.batches))throw 0;
+    if(!confirm('Replace everything on this device with this backup?'))return;S=Object.assign(fresh(),d);S.settings=Object.assign(fresh().settings,d.settings||{});save();go('#/today');toast('Backup restored')}).catch(()=>alert('That file is not a Crumb backup.'))});
+
+/* ---------- timers ---------- */
+let ac;
+function audio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume()}catch(e){}}
+function beep(){audio();if(!ac)return;try{[0,.35,.7].forEach(o=>{const os=ac.createOscillator(),g=ac.createGain();os.frequency.value=880;os.connect(g);g.connect(ac.destination);g.gain.setValueAtTime(.25,ac.currentTime+o);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+o+.3);os.start(ac.currentTime+o);os.stop(ac.currentTime+o+.3)})}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([300,150,300,150,300])}catch(e){}}
+function tick(){const now=Date.now();
+  document.querySelectorAll('[data-end]').forEach(el=>el.textContent=clock(+el.dataset.end-now));
+  document.querySelectorAll('[data-since]').forEach(el=>el.textContent=dur((now-+el.dataset.since)/6e4));
+  let fired=false;
+  S.batches.forEach(b=>{const t=b.timer;if(t&&!t.fired&&now>=t.end){t.fired=true;fired=true;const s=steps(b).find(x=>x.key===t.key);const msg=`${b.name}: ${s?s.title:'timer'} is up`;
+    beep();toast(msg);
+    try{if('Notification'in window&&Notification.permission==='granted'){navigator.serviceWorker&&navigator.serviceWorker.ready.then(r=>r.showNotification('Crumb',{body:msg,icon:'icon-192.png',tag:b.id})).catch(()=>new Notification('Crumb',{body:msg}))}}catch(e){}}});
+  if(fired)save()}
+setInterval(tick,1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+document.addEventListener('pointerdown',audio,{once:true});
+
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+lastHash=location.hash;render();
+</script>
+</body>
+</html>
