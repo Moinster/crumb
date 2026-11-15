@@ -47,7 +47,7 @@ a{color:var(--accent)}
 .btns .btn{flex:1}
 label.f{display:block;margin:14px 0 4px;font-weight:600;font-size:14px}
 .hint{font-weight:400;color:var(--mute);font-size:13px}
-input[type=text],input[type=number],input[type=datetime-local],input[type=date],select,textarea{
+input[type=text],input[type=number],input[type=datetime-local],input[type=date],input[type=time],select,textarea{
   width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:16px system-ui,sans-serif}
 textarea{min-height:80px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -84,6 +84,12 @@ nav a.on{color:var(--accent)}
 .check{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid var(--line)}
 .check:first-of-type{border-top:0}
 .check input{width:22px;height:22px;accent-color:var(--accent);flex:none}
+.guide{border-left:4px solid var(--accent)}
+.guide .sub:first-child{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--accent)}
+.bar{height:6px;border-radius:99px;background:var(--soft);overflow:hidden;margin:6px 0 10px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+ul.steps{padding-left:22px;margin:10px 0}
+ul.steps li{margin:8px 0;font-size:17px}
 .msg{padding:10px 14px;border-radius:14px;margin:8px 0;overflow-wrap:anywhere}
 .msg.user{background:var(--accent);color:var(--accent-ink);margin-left:44px;border-bottom-right-radius:4px}
 .msg.assistant{background:var(--card);border:1px solid var(--line);margin-right:24px;border-bottom-left-radius:4px}
@@ -111,10 +117,10 @@ const EQUIP=[
   ['lame','Lame or razor','Scoring'],
 ];
 const CLASSIC={id:'classic',name:'Classic country loaf',flour:450,whole:50,water:375,starter:100,salt:10,folds:4,interval:30,autolyse:45,notes:'75% hydration, 20% starter. A forgiving everyday loaf.'};
-function fresh(){return{settings:{unit:'F',prooferTemp:78,equip:Object.fromEntries(EQUIP.map(e=>[e[0],true]))},starters:[],recipes:[],batches:[]}}
+function fresh(){return{settings:{unit:'F',prooferTemp:78,equip:Object.fromEntries(EQUIP.map(e=>[e[0],true])),remind:{on:true,feed:true,check:true,fridge:true,bake:true,feedTime:'08:00',quietFrom:'22:00',quietTo:'07:00'}},starters:[],recipes:[],batches:[],reminders:[],fired:{}}}
 let S=fresh(),memOnly=false;
 try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);S=Object.assign(fresh(),d);S.settings=Object.assign(fresh().settings,d.settings||{})}}catch(e){memOnly=true}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}writeSchedule()}
 
 /* ---------- helpers ---------- */
 const H=3600e3,D=24*H;
@@ -337,14 +343,18 @@ function curStep(b){return steps(b).find(s=>!b.done[s.key])}
 function batchCard(b){const c=curStep(b),tm=b.timer;
   return `<a class="card" href="#/bake/${b.id}"><div class="row"><div class="grow"><h3>${esc(b.name)}</h3><div class="sub">${b.status==='done'?'Baked '+when(b.finishedAt||b.createdAt)+(b.result?' · '+'★'.repeat(b.result.rating||0):' · add your results'):c?'Next: '+esc(c.title):'All steps done'}</div></div>${tm&&b.status!=='done'?`<span class="count" data-end="${tm.end}">${clock(tm.end-Date.now())}</span>`:''}</div></a>`}
 
+function feedBtn(st,s){const id=st.id;return isGuided(st)?`<a class="btn pri" href="#/starter/${id}/guide">${s.act==='stir'&&s.due?'Guided stir':'Guided feed'}</a>`
+  :s.act==='stir'&&s.due?`<button class="btn pri" data-act="stir" data-id="${id}">Mark stirred</button>`:`<a class="btn pri" href="#/starter/${id}/feed">Feed</a>`}
 V.today=()=>{
   const due=S.starters.filter(s=>stStatus(s).due),ok=S.starters.filter(s=>!stStatus(s).due),act=S.batches.filter(b=>b.status!=='done');
-  const noRes=S.batches.filter(b=>b.status==='done'&&!b.result).slice(0,2);
+  const noRes=S.batches.filter(b=>b.status==='done'&&!b.result).slice(0,2),nw=Date.now(),mine=S.reminders.filter(r=>r.t<=nw),up=schedule().filter(r=>r.t>nw).slice(0,4);
   if(!S.starters.length&&!S.batches.length)return `<h1>Crumb</h1><p class="sub">Your sourdough starters and bakes, kept on this device.</p><div class="card empty"><p>Start by adding a starter. The app will tell you when to feed it and what its behaviour means.</p><a class="btn pri full" href="#/starter/new">Add a starter</a></div>`;
   return `<h1>Today</h1><p class="sub">${new Date().toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'})}</p>
   ${memOnly?'<div class="tip warn"><b>Storage is unavailable</b><p>This browser is blocking device storage, so nothing will be saved after you close the app.</p></div>':''}
-  <h2>Needs attention</h2>${due.length?due.map(st=>{const s=stStatus(st);return `<div class="card"><div class="row"><div class="grow"><h3>${esc(st.name)}</h3><div class="sub">${esc(s.line)}</div></div><span class="badge ${s.lv}">${s.label}</span></div><div class="btns"><a class="btn pri" href="#/starter/${st.id}/${s.act==='stir'?'stir':'feed'}" ${s.act==='stir'?`data-act="stir" data-id="${st.id}"`:''}>${s.act==='stir'?'Mark stirred':'Feed'}</a><a class="btn" href="#/starter/${st.id}/check">Check-in</a></div></div>`}).join(''):'<div class="card sub">Nothing is due. All starters are fed.</div>'}
+  <h2>Needs attention</h2>${due.length?due.map(st=>{const s=stStatus(st);return `<div class="card"><div class="row"><div class="grow"><h3>${esc(st.name)}</h3><div class="sub">${esc(s.line)}</div></div><span class="badge ${s.lv}">${s.label}</span></div><div class="btns">${feedBtn(st,s)}<a class="btn" href="#/starter/${st.id}/check">Check-in</a></div></div>`}).join(''):'<div class="card sub">Nothing is due. All starters are fed.</div>'}
   ${act.length?'<h2>Bakes in progress</h2>'+act.map(batchCard).join(''):''}
+  ${mine.length||up.length?'<h2>Reminders</h2><div class="card">'+mine.map(r=>`<div class="log row"><div class="grow"><div class="sub">${soon(r.t)}</div><b>${esc(r.text)}</b></div><button class="btn sm" data-act="remDone" data-id="${r.id}">Done</button></div>`).join('')+up.map(r=>`<div class="log row"><div class="grow"><div class="sub">${soon(r.t)}</div>${esc(r.title)}</div>${r.id.startsWith('man:')?`<button class="x" aria-label="Delete reminder" data-act="remDone" data-id="${r.id.slice(4)}">×</button>`:''}</div>`).join('')+'</div>':''}
+  ${S.starters.length&&S.settings.remind.on&&'Notification'in window&&Notification.permission==='default'?'<a class="card" href="#/reminders"><b>Turn on notifications</b><div class="sub">So feed and check reminders can reach you outside the app</div></a>':''}
   ${noRes.length?'<h2>How did it turn out?</h2>'+noRes.map(batchCard).join(''):''}
   ${ok.length?'<h2>All good</h2>'+ok.map(starterCard).join(''):''}
   <div class="btns"><a class="btn" href="#/bake/new">Start a bake</a><a class="btn" href="#/starter/new">Add a starter</a></div>
@@ -360,6 +370,7 @@ function starterForm(st){const n=!st;st=st||{name:'',flour:'Whole wheat',mode:'e
   <label class="f">Day 1 date <span class="hint">only for a starter made from scratch</span></label><input type="date" name="startDate" value="${localInput(st.startDate).slice(0,10)}">
   <label class="f">Where it lives <span class="hint">sets the feeding schedule once established</span></label>${chips('storage',[['counter','Counter, fed daily'],['fridge','Fridge, fed every 3–5 days']],st.storage,true)}
   <label class="f">Flour</label><input type="text" name="flour" maxlength="40" value="${esc(st.flour)}">
+  <label class="f">Guided mode <span class="hint">step-by-step feeds with explanations; switch it off any time</span></label>${chips('guided',[['1','On'],['0','Off']],n||isGuided(st)?'1':'0',true)}
   <label class="f">Notes</label><textarea name="notes" maxlength="500">${esc(st.notes)}</textarea>
   <div class="btns"><button class="btn pri">Save</button></div></form>
   ${n?'':`<div class="btns"><button class="btn danger" data-act="delStarter" data-id="${st.id}">Delete this starter</button></div>`}`}
@@ -373,14 +384,17 @@ V.starter=id=>{const st=starter(id);if(!st)return V.starters();
     :l.type==='stir'?'<b>Stirred</b>':`<b>Check-in</b> ${[lab(RISE,l.rise),lab(SMELL,l.smell),lab(SURFACE,l.surface)!=='Normal'?lab(SURFACE,l.surface):''].filter(Boolean).join(', ')}${l.hrs!=null?` · ${l.hrs.toFixed(1)} h after feeding`:''}${l.notes?'<br>'+esc(l.notes):''}`;
   return `${back('#/starters','Starters')}<div class="row"><h1>${esc(st.name)}</h1><a class="btn sm" href="#/starter/${id}/edit">Edit</a></div>
   <p><span class="badge ${s.lv}">${s.label}</span> <span class="badge ${hl}">${h}</span></p>
+  ${isGuided(st)?guideCard(st):''}
   <div class="card"><dl class="kv">
     <dt>${st.mode==='new'?'Stage':'Lives'}</dt><dd>${st.mode==='new'?'Day '+s.day+' of building':st.storage==='fridge'?'In the fridge':'On the counter'}</dd>
     <dt>Flour</dt><dd>${esc(st.flour||'–')}</dd>
     <dt>Last fed</dt><dd>${lf?ago(lf.t):'never'}</dd>
     ${st.mode==='new'?`<dt>Today</dt><dd>${esc(s.line.split(' · ')[1])}</dd>`:`<dt>Next</dt><dd>${esc(s.line.split(' · ')[1]||'')}</dd>`}
   </dl>${st.notes?`<p class="sub">${esc(st.notes)}</p>`:''}
-  <div class="btns">${s.act==='stir'&&s.due?`<button class="btn pri" data-act="stir" data-id="${id}">Mark stirred</button>`:`<a class="btn pri" href="#/starter/${id}/feed">Feed</a>`}<a class="btn" href="#/starter/${id}/check">Check-in</a></div>
-  <div class="btns"><a class="btn" href="#/chat/starter/${id}">Ask Crumb about this starter</a></div>
+  <div class="btns">${feedBtn(st,s)}<a class="btn" href="#/starter/${id}/check">Check-in</a></div>
+  ${isGuided(st)?`<p class="sub"><a href="#/starter/${id}/feed">Log a feed without the guide</a></p>`:''}
+  <div class="btns"><a class="btn" href="#/chat/starter/${id}">Ask Crumb</a><a class="btn" href="#/starter/${id}/remind">Remind me</a></div>
+  <label class="check"><input type="checkbox" data-toggle="guided" data-id="${id}" ${isGuided(st)?'checked':''}><span><b>Guided mode</b><br><span class="hint">Step-by-step feeds with explanations</span></span></label>
   ${st.mode==='new'&&s.day>=7?`<div class="btns"><button class="btn" data-act="graduate" data-id="${id}">Mark as established</button></div><p class="sub">Do this once it doubles within 6 hours of a feed.</p>`:''}</div>
   ${c?`<h2>Guidance from ${when(c.t)}</h2>${tipsHtml(c.tips)}`:`<h2>Guidance</h2><div class="card sub">Do a check-in a few hours after feeding and you will get advice based on what you see.</div>`}
   <h2>History</h2><div class="card">${log.length?log.map(l=>`<div class="log row"><div class="grow"><div class="sub">${when(l.t)}</div>${desc(l)}</div><button class="x" aria-label="Delete entry" data-act="delLog" data-id="${id}" data-log="${l.id}">×</button></div>`).join(''):'<span class="sub">Nothing logged yet.</span>'}</div>`};
@@ -503,7 +517,7 @@ V.more=()=>{const eq=S.settings.equip,np=('Notification'in window)?Notification.
   <label class="f">Tools I normally use <span class="hint">pre-ticked for each new bake</span></label>
   ${EQUIP.map(([k,l])=>`<label class="check"><input type="checkbox" name="eq_${k}" ${eq[k]?'checked':''}><span>${l}</span></label>`).join('')}
   <div class="btns"><button class="btn pri">Save settings</button></div></div></form>
-  <h2>Timer alerts</h2><div class="card"><p class="sub">Timers beep and vibrate while the app is open. Allowing notifications also shows an alert when the app is in the background. ${np==='granted'?'Notifications are on.':np==='denied'?'Notifications are blocked in your browser settings.':np==='unsupported'?'This browser does not support notifications.':''}</p>${np==='default'?'<button class="btn full" data-act="notify">Allow notifications</button>':''}<div class="btns"><button class="btn" data-act="beepTest">Test the sound</button></div></div>
+  <h2>Reminders</h2><a class="card" href="#/reminders"><b>Reminders and notifications</b><div class="sub">${S.settings.remind.on?'Automatic reminders are on':'Automatic reminders are off'} · feed time, quiet hours, alerts</div></a>
   <h2>Your data</h2><div class="card"><p class="sub">Everything is stored only on this device. Clearing your browser data erases it, so export a backup now and then.</p><div class="btns"><button class="btn" data-act="export">Export backup</button><label class="btn">Import backup<input type="file" accept="application/json,.json" id="imp" hidden></label></div><div class="btns"><button class="btn danger" data-act="wipe">Erase everything</button></div></div>`};
 
 V.guide=()=>`${back('#/more','More')}<h1>Starter guide</h1>
@@ -522,6 +536,133 @@ V.guide=()=>`${back('#/more','More')}<h1>Starter guide</h1>
 <div class="tip"><b>Rises and collapses before the next feed</b><p>It is eating fast. Feed 1:3:3 or 1:5:5, or keep it a little cooler.</p></div>
 <div class="tip bad"><b>Pink, orange or fuzzy growth</b><p>Contaminated. Throw it out and clean the jar thoroughly.</p></div>
 <h2>Feeding ratios</h2><div class="card"><p>Ratios are starter : flour : water by weight. <b>1:1:1</b> peaks in roughly 4–6 h when warm. <b>1:2:2</b> takes 6–8 h. <b>1:5:5</b> takes 10–12 h, good for overnight.</p></div>`;
+
+/* ---------- reminders ---------- */
+const hm=s=>{const[a,b]=String(s||'8:00').split(':');return(+a||0)*60+(+b||0)};
+const atTime=(day,s)=>{const d=new Date(day0(day));d.setMinutes(hm(s));return d.getTime()};
+const clockTime=t=>new Date(t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+const soon=t=>(day0(t)===day0(Date.now())?'Today':day0(t)===day0(Date.now()+D)?'Tomorrow':new Date(t).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}))+' '+clockTime(t);
+function quiet(t){const R=S.settings.remind;if(!R.quietFrom||!R.quietTo||R.quietFrom===R.quietTo)return t;
+  const d=new Date(t),m=d.getHours()*60+d.getMinutes(),a=hm(R.quietFrom),b=hm(R.quietTo);
+  if(!(a<b?(m>=a&&m<b):(m>=a||m<b)))return t;const e=atTime(t,R.quietTo);return e>t?e:e+D}
+function peakHrs(st,lf){if(st.mode==='new')return 10;const r=lf.kept&&lf.flour?lf.flour/lf.kept:1;
+  return Math.min(16,Math.max(3,interp(r,[[.5,4],[1,5],[2,7],[3,9],[5,11],[10,14]])*interp(lf.temp??75,BULK)/5))}
+// Everything Crumb plans to remind you about, soonest first. days>1 looks further ahead for the background check.
+function schedule(days=1){const R=S.settings.remind,now=Date.now(),out=[];if(!R.on)return out;
+  const add=(id,t,title,body,url,q=true)=>out.push({id,t:q?quiet(t):t,title,body,url});
+  S.starters.forEach(st=>{const lf=lastOf(st,'feed'),u='#/starter/'+st.id+(isGuided(st)?'/guide':'');
+    if(R.feed){
+      if(st.mode==='new'){const s=stStatus(st);for(let i=0;i<days;i++){const off=(s.due?0:1)+i,dn=s.day+off,t=atTime(now+off*D,R.feedTime);
+        add(`feed:${st.id}:${day0(t)}`,t,`Time to ${dn===2?'stir':'feed'} ${st.name}`,`Day ${dn} of building your starter.`,u)}}
+      else if(lf)add(`feed:${st.id}:${lf.t}`,lf.t+(st.storage==='fridge'?96:24)*H,`Time to feed ${st.name}`,st.storage==='fridge'?'It has been 4 days since its last feed.':'It was last fed a day ago.',u)}
+    if(lf&&R.check&&lf.place!=='fridge'&&!st.log.some(l=>l.type==='check'&&l.t>lf.t))add(`check:${st.id}:${lf.t}`,lf.t+peakHrs(st,lf)*H,`Check on ${st.name}`,st.mode==='new'?'See how far it has risen and log what you find.':'It should be near its peak. Log what you see for advice.','#/starter/'+st.id+'/check');
+    if(lf&&R.fridge&&st.mode!=='new'&&st.storage==='fridge'&&lf.place!=='fridge')add(`fridge:${st.id}:${lf.t}`,lf.t+2*H,`Put ${st.name} back in the fridge`,'It has had about 2 hours out since feeding.','#/starter/'+st.id)});
+  S.reminders.forEach(r=>{const st=starter(r.starterId);add('man:'+r.id,r.t,r.text,st?st.name:'Your reminder',st?'#/starter/'+st.id:'#/today',false)});
+  return out.sort((a,b)=>a.t-b.t)}
+function calUrl(title,t,daily){const f=x=>new Date(x).toISOString().replace(/[-:]|\.\d{3}/g,'');
+  return'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+f(t)+'/'+f(t+15*6e4)+(daily?'&recur='+encodeURIComponent('RRULE:FREQ=DAILY'):'')}
+function notify(title,body,tag,url){try{if(!('Notification'in window)||Notification.permission!=='granted')return;
+  const o={body,icon:'icon-192.png',badge:'icon-192.png',tag,data:{url}};
+  if(navigator.serviceWorker&&location.protocol.startsWith('http'))navigator.serviceWorker.ready.then(r=>r.showNotification(title,o)).catch(()=>{});else new Notification(title,o)}catch(e){}}
+function fireReminders(){const now=Date.now();let ch=false;
+  schedule().forEach(r=>{if(r.t>now||S.fired[r.id])return;S.fired[r.id]=now;ch=true;
+    if(now-r.t>12*H)return; // long overdue: the Today screen already shows it
+    notify(r.title,r.body,r.id,r.url);if(!document.hidden){beep();toast(r.title)}});
+  if(ch){for(const k in S.fired)if(now-S.fired[k]>14*D)delete S.fired[k];save();if(!document.hidden&&/^#\/(today)?$/.test(location.hash||'#/'))render()}}
+// The service worker cannot read this page's storage, so the plan is mirrored into a cache it can read.
+let bgState='unknown',schedTimer;
+function writeSchedule(){clearTimeout(schedTimer);schedTimer=setTimeout(()=>{try{if(!('caches'in window))return;
+  const items=schedule(3).filter(r=>!S.fired[r.id]);
+  if(S.settings.remind.on&&S.settings.remind.bake)S.batches.forEach(b=>{const t=b.timer;if(t&&!t.fired&&b.status!=='done'){const s=steps(b).find(x=>x.key===t.key);items.push({id:b.id,t:t.end,title:'Crumb',body:`${b.name}: ${s?s.title:'timer'} is up`,url:'#/bake/'+b.id})}});
+  caches.open('crumb-data').then(c=>c.put('schedule.json',new Response(JSON.stringify(items)))).catch(()=>{})}catch(e){}},400)}
+async function bgSetup(){try{if(!('serviceWorker'in navigator)||!location.protocol.startsWith('http')){bgState='unsupported';return}
+  const reg=await navigator.serviceWorker.ready;
+  try{const c=await caches.open('crumb-data'),r=await c.match('shown.json');if(r){const sh=await r.json();let ch=false;for(const k in sh)if(!S.fired[k]){S.fired[k]=sh[k];ch=true}if(ch)save()}}catch(e){}
+  if(!('periodicSync'in reg)){bgState='unsupported';return}
+  const p=await navigator.permissions.query({name:'periodic-background-sync'});
+  if(p.state!=='granted'){bgState='notinstalled';return}
+  if(S.settings.remind.on){await reg.periodicSync.register('crumb-reminders',{minInterval:30*6e4});bgState='on'}else{await reg.periodicSync.unregister('crumb-reminders');bgState='off'}}catch(e){bgState='unsupported'}}
+V.reminders=()=>{const R=S.settings.remind,np=('Notification'in window)?Notification.permission:'unsupported',up=schedule().filter(r=>r.t>Date.now()).slice(0,6);
+  const ck=(k,l,h)=>`<label class="check"><input type="checkbox" name="${k}" ${R[k]?'checked':''}><span><b>${l}</b><br><span class="hint">${h}</span></span></label>`;
+  return `${back('#/more','More')}<h1>Reminders</h1>
+  <form data-form="remind"><div class="card"><label class="f" style="margin-top:0">Automatic reminders</label>${chips('on',[['1','On'],['0','Off']],R.on?'1':'0',true)}
+  <p class="sub">When on, Crumb works out the times from what you log. You do not need to set anything.</p>
+  ${ck('feed','Feeding','When a starter is due, based on its last feed')}${ck('check','Check on it','Around the expected peak after each feed')}${ck('fridge','Back in the fridge','2 hours after feeding a fridge starter')}${ck('bake','Bake timers','When a step timer finishes')}
+  <label class="f">Daily feed time <span class="hint">for starters being built from scratch</span></label><input type="time" name="feedTime" value="${esc(R.feedTime)}" required>
+  <label class="f">Quiet hours <span class="hint">feed and check reminders wait until these end</span></label><div class="grid2"><input type="time" name="quietFrom" aria-label="Quiet hours start" value="${esc(R.quietFrom)}"><input type="time" name="quietTo" aria-label="Quiet hours end" value="${esc(R.quietTo)}"></div>
+  <div class="btns"><button class="btn pri">Save</button></div></div></form>
+  <h2>Notifications on this phone</h2><div class="card"><p class="sub">${np==='granted'?'Notifications are allowed.':np==='denied'?'Notifications are blocked. Allow them for this site in your browser settings.':np==='unsupported'?'This browser does not support notifications. Reminders will still show inside the app.':'Allow notifications so reminders can appear outside the app.'}</p>
+  ${np==='default'?'<button class="btn pri full" data-act="notify">Allow notifications</button>':''}
+  <p class="sub"><b>While Crumb is open</b> (even in the background) reminders arrive on time with a sound.</p>
+  <p class="sub"><b>When Crumb is fully closed</b> ${bgState==='on'?'this phone lets it check in the background, but only every few hours at times Android chooses, so a reminder can be late.':bgState==='notinstalled'?'background checks need the app installed: use “Add to Home screen” in Chrome, then reopen it.':bgState==='off'?'background checks are off because reminders are off.':'this browser cannot wake the app, so reminders wait until you next open it.'} For an alarm at the exact time, add the reminder to your calendar below.</p>
+  <div class="btns"><button class="btn" data-act="beepTest">Test the sound</button><button class="btn" data-act="notifyTest">Test a notification</button></div></div>
+  <h2>Coming up</h2><div class="card">${up.length?up.map(r=>`<div class="log row"><div class="grow"><div class="sub">${soon(r.t)}</div>${esc(r.title)}</div><a class="btn sm" target="_blank" rel="noopener" href="${calUrl(r.title,r.t)}">Calendar</a></div>`).join(''):'<span class="sub">Nothing scheduled.'+(R.on?' Reminders appear once you log a feed.':'')+'</span>'}</div>
+  <div class="btns"><a class="btn" href="#/remind">Set my own reminder</a><a class="btn" target="_blank" rel="noopener" href="${calUrl('Feed my sourdough starter',atTime(Date.now()+D,R.feedTime),true)}">Daily alarm in calendar</a></div>`};
+V.remindNew=id=>{const st=starter(id);
+  return `${back(st?'#/starter/'+id:'#/reminders',st?esc(st.name):'Reminders')}<h1>Remind me</h1>
+  <form data-form="remindNew" data-id="${st?id:''}"><label class="f">About</label><input type="text" name="text" required maxlength="60" value="${st?'Check on '+esc(st.name):''}" placeholder="e.g. Take the butter out">
+  <label class="f">In</label>${chips('inH',[['1','1 h'],['2','2 h'],['4','4 h'],['6','6 h'],['8','8 h'],['12','12 h']],'4')}
+  <label class="f">Or at an exact time <span class="hint">overrides the choice above</span></label><input type="datetime-local" name="at">
+  <div class="btns"><button class="btn pri">Set reminder</button></div></form>`};
+
+/* ---------- guided mode ---------- */
+const isGuided=st=>st.guided??st.mode==='new';
+function phase(d){return d<=1?['Day 1: mixing','Flour and water wake up the wild yeast and bacteria already living on the flour.','Nothing visible today. That is expected.']
+  :d===2?['Day 2: first stirrings','The microbes are multiplying. A stir adds oxygen and spreads them through the mix.','A few tiny bubbles, or none at all.']
+  :d===3?['Day 3: first feed','From today you discard and feed once a day. Fast-growing early bacteria are often very active now.','A burst of bubbles, a big rise or odd smells such as cheese or sour milk. This is not yeast yet.']
+  :d<=6?[`Day ${d}: the quiet phase`,'The mix is turning acidic. That kills off the early bacteria and makes room for yeast and the right bacteria, which grow more slowly.','Little or no rise for a few days. It can look dead. It is not. Keep feeding at the same time each day.']
+  :d<=10?[`Day ${d}: yeast taking over`,'A regular rise and fall after each feed should be appearing, with a tangy, yeasty smell.','Rising within 8–12 h of a feed, then falling back. It is ready when it doubles within 6 h.']
+  :[`Day ${d}: nearly there`,'Some starters take two weeks or more, especially in a cool kitchen.',`If it is not doubling yet, keep it at ${T(75)}–${T(80)} and keep feeding. Patience is the fix.`]}
+function guideCard(st){const s=stStatus(st),lf=lastOf(st,'feed'),now=Date.now();let t,b,n='';
+  if(st.mode==='new')[t,b,n]=phase(s.day);
+  else if(!lf){t='Start with a feed';b='Crumb needs one feed logged to work out your schedule. The guided feed walks you through it, one step at a time.'}
+  else{const gap=(now-lf.t)/D,pk=lf.t+peakHrs(st,lf)*H,chk=st.log.some(l=>l.type==='check'&&l.t>lf.t);
+    if(gap>10){t='Waking it up after a break';b=`It has been ${Math.round(gap)} days since the last feed. Expect dark liquid on top and a sharp smell. It is hungry, not dead.`;n='Plan on 2–3 feeds about 12 hours apart at room temperature. It is back when it doubles within 6 hours of a feed.'}
+    else if(s.due){t='Time to feed';b=st.storage==='fridge'?'Take it out of the fridge, feed it, leave it out for 2 hours, then put it back.':'A daily feed keeps the yeast strong and the flavour mild.'}
+    else if(lf.place==='fridge'||(st.storage==='fridge'&&now-lf.t>3*H)){t='Resting in the fridge';b=`Next feed by ${soon(lf.t+96*H)}.`;n='To bake, take it out the day before, feed it, and use it once it has doubled.'}
+    else if(!chk&&now<pk){t='Rising';b=`Fed ${ago(lf.t)}. Expect the peak around ${soon(pk)}.`;n='At the peak it has doubled, the top is domed and bubbly, and it smells tangy. That is the moment to bake with it.'}
+    else if(!chk){t='Have a look now';b='It should be at or near its peak. Do a check-in and Crumb will tell you what it means.'}
+    else{t='All good';b=s.line+'.';n='Planning to bake? Feed it 4–6 hours before you mix the dough so it is at its peak.'}}
+  return `<div class="card guide"><div class="sub">GUIDED MODE</div><h3>${esc(t)}</h3><p>${esc(b)}</p>${n?`<p class="sub"><b>${st.mode==='new'?'Normal right now':'Good to know'}:</b> ${esc(n)}</p>`:''}</div>`}
+let W=null;
+function wizPlan(st,v){const s=stStatus(st),lf=lastOf(st,'feed'),isNew=st.mode==='new',d=s.day,A=[],R=S.settings.remind;
+  const kit=S.settings.equip.proofer,fl=esc(st.flour||'flour'),li=a=>'<ul class="steps">'+a.filter(Boolean).map(x=>`<li>${x}</li>`).join('')+'</ul>',why=x=>`<p class="sub"><b>Why:</b> ${x}</p>`;
+  if(isNew&&!s.due)return{plan:{none:true},steps:[{t:'Done for today',h:`<p>Day ${d} is already logged. There is nothing more to do until tomorrow${R.on&&R.feed?' around '+clockTime(atTime(Date.now(),R.feedTime)):''}.</p>${why('One feed a day at about the same time is all a new starter needs. Extra feeds dilute it and slow it down.')}`}]};
+  const first=isNew&&d<=1,stir=isNew&&d===2;
+  const keep=first?0:isNew?null:(num(v.kept)??lf?.kept??50),ratio=num(v.ratio)??(lf&&lf.kept?[1,2,3,5].reduce((a,x)=>Math.abs(x-lf.flour/lf.kept)<Math.abs(a-lf.flour/lf.kept)?x:a,1):1);
+  const plan={stir,discard:first?0:isNew?100:null,kept:isNew?null:keep,flour:first?60:isNew?50:Math.round(keep*ratio),water:first?80:isNew?50:Math.round(keep*ratio)};
+  const gap=lf?(Date.now()-lf.t)/D:0,cool=`If your kitchen is cool, use warm water, about ${T(85)}.`;
+  A.push({t:'Get ready',h:(stir?`<p>Day 2 is only a stir. No flour or water today.</p>${why('Stirring adds oxygen and spreads the microbes through the mix.')}`
+    :first?`<p>Today you mix flour and water, and that is all.</p>${why('Wild yeast and bacteria already live on the flour. Water wakes them up.')}`
+    :`<p>${isNew?`Day ${d}: discard and feed.`:'A feed takes about two minutes.'}</p>${why('Feeding gives the culture fresh food and dilutes the acid it has made. Discarding first keeps the amount small, so each feed is a proper meal.')}`)
+    +(!isNew&&gap>10?`<div class="tip warn"><b>It has been ${Math.round(gap)} days</b><p>Dark liquid on top and a sharp smell are normal after a break. Pour the liquid off. It may take 2–3 feeds, 12 hours apart, to get back to full strength.</p></div>`:'')
+    +'<p><b>You need:</b></p>'+li(['A kitchen scale','A spatula or spoon',!stir&&`${plan.flour} g ${fl}`,!stir&&`${plan.water} g water. Tap water is fine; if yours smells of chlorine, let it stand for an hour first`,first&&'A clean jar, a cloth and a rubber band',!first&&!stir&&'A bin or a discard jar',!isNew&&st.storage==='fridge'&&'Take the starter out of the fridge. It does not need to warm up first'])});
+  if(!first)A.push({t:'Look and smell first',h:`<p>Before you touch it, see what it has done since the last feed. This is saved as a check-in, and it is how Crumb spots problems early.</p>
+    <label class="f">Rise since the last feed <span class="hint">optional</span></label>${chips('rise',RISE,v.rise)}<label class="f">Smell</label>${chips('smell',SMELL,v.smell)}<label class="f">Surface</label>${chips('surface',SURFACE,v.surface||'normal')}`});
+  if(v.surface==='mold'||v.surface==='pink'){A.push({t:'Do not feed this starter',stop:true,h:`<div class="tip bad"><b>Throw it away</b><p>Fuzzy mold or pink or orange streaks mean it is contaminated. It cannot be rescued by feeding.</p></div>${li(['Discard all of it','Wash the jar and spatula in very hot soapy water','Start a new one, or use a backup if you have one'])}`});return{plan,steps:A}}
+  if(stir){A.push({t:'Stir',h:li(['Stir well for about 30 seconds, right down to the bottom','Scrape the sides down so the level is easy to see'])+'<p class="sub">A few tiny bubbles are a good sign. None is also fine.</p>'});
+    A.push({t:'Cover and leave',h:li(['Cover with the cloth','Leave it on the counter for another 24 hours',kit?`Your proofer at ${T(S.settings.prooferTemp)} will keep it at the ideal temperature`:`Aim for ${T(75)}–${T(80)}. A cool kitchen just makes it slower`])})}
+  else{
+    if(!isNew)A.push({t:'How much to keep',h:`<p>You keep a small amount and feed that. The rest is discard.</p><label class="f">Starter to keep (g)</label><input type="number" inputmode="decimal" step="any" min="5" name="kept" required value="${keep}">
+      <label class="f">Feed ratio <span class="hint">starter : flour : water</span></label>${chips('ratio',[['1','1:1:1'],['2','1:2:2'],['3','1:3:3'],['5','1:5:5']],String(ratio),true)}
+      <p class="sub">1:1:1 peaks in about 4–6 hours when warm and suits a daily feed. A bigger ratio takes longer, which helps overnight or if it keeps collapsing before the next feed.</p>`});
+    if(!first)A.push({t:isNew?'Discard 100 g':`Discard down to ${keep} g`,h:li(['Stir it down first',isNew?'Spoon out 100 g and throw it away':st.jarTare!=null?`Spoon starter out until the scale, with the jar on it, reads <b>${Math.round(st.jarTare+keep)} g</b>. Your empty jar weighs ${st.jarTare} g`:`Easiest way: put a clean jar on the scale, zero it, and spoon in <b>${keep} g</b> of starter. The rest is discard`,'Put discard in the bin or a discard jar, not down the drain. It sets like glue'])+why('Without discarding, the jar doubles every day and each feed gets too small to keep the yeast going.')});
+    A.push({t:`Add ${plan.water} g water`,h:li(['Put the jar on the scale and zero it',`Pour in <b>${plan.water} g</b> water`,'Stir until it looks milky with no lumps'])+`<p class="sub">Water first is easier to mix. ${cool}</p>`});
+    A.push({t:`Add ${plan.flour} g flour`,h:li(['Zero the scale again',`Add <b>${plan.flour} g</b> ${fl}`,'Mix until there is no dry flour','Scrape the sides down and level the top'])});
+    A.push({t:'Mark and cover',h:li(['Put the rubber band around the jar at the level of the starter','Note the time. Crumb logs it when you finish',st.storage==='fridge'&&!isNew?'Cover it loosely for now. The lid goes on when it returns to the fridge':'Cover with the cloth so gas can escape'])+why('The band is how you measure the rise. “Doubled” means twice as far above the bottom as the band.')});
+    A.push({t:'Where is it resting?',h:`<p>${kit?`Your proofer at ${T(S.settings.prooferTemp)} is ideal.`:`Somewhere steady at ${T(75)}–${T(80)} is ideal: the oven with only the light on, or the top of the fridge.`} Temperature is the biggest factor in how fast it rises.</p>
+      <label class="f">Resting place</label>${chips('place',PLACE.slice(0,2),v.place||(kit?'proofer':'counter'),true)}${tempField('temp','Temperature there',v.temp!==undefined&&v.temp!==''?toF(num(v.temp)):(kit?S.settings.prooferTemp:null),'optional')}`})}
+  const pk=stir?null:peakHrs(st,{kept:plan.kept,flour:plan.flour,temp:toF(num(v.temp))}),rem=R.on?(R.check&&!stir?`Crumb will remind you to check on it around ${clockTime(Date.now()+pk*H)}.`:R.feed?'Crumb will remind you when the next feed is due.':''):'Reminders are off. You can turn them on under More.';
+  A.push({t:'What happens next',h:(isNew?`<p>${esc(phase(stir?2:d)[2])}</p>`+li([stir?'Tomorrow is the first discard and feed':d>=7?'Check it 4–6 hours from now. Once it doubles within 6 hours, it is ready to bake with':'Expect any rise 8–12 hours from now, then a fall','Feed again at about the same time tomorrow'])
+    :li([`It should peak in roughly ${hrsRange(pk)}`,'At the peak it has doubled, the top is domed and bubbly, and it smells tangy','That is the moment to bake with it',st.storage==='fridge'?'Not baking? Leave it out for 2 hours, then back in the fridge with the lid on':'Not baking? Just feed it again tomorrow']))+`<p class="sub">${rem}</p>`});
+  return{plan,steps:A}}
+function wizFinish(st,v,plan){const now=Date.now(),lf=lastOf(st,'feed');
+  if(v.rise){const c={id:uid(),type:'check',t:now-1000,rise:v.rise,smell:v.smell,surface:v.surface||'normal',temp:null,amount:null,notes:'',hrs:lf?(now-lf.t)/H:null};c.tips=starterTips(st,c);st.log.push(c)}
+  st.log.push(plan.stir?{id:uid(),type:'stir',t:now}:{id:uid(),type:'feed',t:now,discard:plan.discard,kept:plan.kept,flour:plan.flour,water:plan.water,place:v.place||'counter',temp:toF(num(v.temp))})}
+V.wiz=id=>{const st=starter(id);if(!st)return V.starters();if(!W||W.id!==id)W={id,i:0,v:{}};
+  const{steps:A,plan}=wizPlan(st,W.v);W.i=Math.min(W.i,A.length-1);const x=A[W.i],last=W.i===A.length-1;
+  return `${back('#/starter/'+id,esc(st.name))}<p class="sub">Guided ${plan.stir?'stir':'feed'} · step ${W.i+1} of ${A.length}</p><div class="bar"><i style="width:${(W.i+1)/A.length*100}%"></i></div><h1>${x.t}</h1>
+  <form data-form="wiz" data-id="${id}">${x.h}<div class="btns">${W.i?'<button class="btn" type="button" data-act="wizBack" style="flex:0">Back</button>':''}<button class="btn pri">${x.stop||plan.none?'Close':last?'Finish and log it':'Next'}</button></div></form>`};
 
 /* ---------- AI chat ---------- */
 // Kept under its own storage key so the API key never ends up in a backup export.
@@ -627,11 +768,13 @@ document.addEventListener('change',e=>{const t=e.target;
 const ICON={today:'<path d="M4 11l8-7 8 7v9H4z"/>',starters:'<path d="M8 3h8M7 7h10v12a2 2 0 01-2 2H9a2 2 0 01-2-2zM7 13h10"/>',bakes:'<path d="M3 13a9 6 0 0118 0v5H3zM8 10l1 3M12 9v4M16 10l-1 3"/>',more:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'};
 function render(){
   const p=(location.hash.replace(/^#\/?/,'')||'today').split('/');let html,tab=p[0];
-  if(p[0]==='starter'){tab='starters';html=p[1]==='new'?V.starterNew():p[2]==='feed'?V.feed(p[1]):p[2]==='check'?V.check(p[1]):p[2]==='edit'?V.starterEdit(p[1]):V.starter(p[1])}
+  if(p[0]==='starter'){tab='starters';html=p[1]==='new'?V.starterNew():p[2]==='feed'?V.feed(p[1]):p[2]==='check'?V.check(p[1]):p[2]==='edit'?V.starterEdit(p[1]):p[2]==='guide'?V.wiz(p[1]):p[2]==='remind'?V.remindNew(p[1]):V.starter(p[1])}
   else if(p[0]==='bake'){tab='bakes';html=p[1]==='new'?V.bakeNew():p[2]==='check'?V.bakeCheck(p[1]):p[2]==='result'?V.bakeResult(p[1]):V.bake(p[1])}
   else if(p[0]==='recipe'){tab='bakes';html=V.recipe(p[1])}
   else if(p[0]==='chat'){tab=p[1]==='starter'?'starters':p[1]==='bake'?'bakes':'more';html=V.chat(p[1],p[2]);setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),0)}
   else if(p[0]==='ai'){tab='more';html=V.ai()}
+  else if(p[0]==='reminders'){tab='more';html=V.reminders()}
+  else if(p[0]==='remind'){tab='more';html=V.remindNew()}
   else if(p[0]==='guide'){tab='more';html=V.guide()}
   else html=(V[p[0]]||V.today)();
   if(!V[tab])tab='today';
@@ -659,11 +802,12 @@ function feedMath(e){const f=e.target.form,n=e.target.name;if(!f||f.dataset.form
   if(jt!=null&&k!=null&&['jarTotal','tare','kept','ratio','target'].includes(n)){const d=jt-(num(f.tare.value)||0)-k;if(d>=0)set('discard',d)}
   ratio()}
 document.addEventListener('input',feedMath);
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.toggle==='guided'){const st=starter(t.dataset.id);if(st){st.guided=t.checked;save();render();toast('Guided mode '+(t.checked?'on':'off'))}}});
 
 /* ---------- forms ---------- */
 const FORMS={
   starter(f,id){let st=starter(id);const isNew=!st;if(isNew){st={id:uid(),log:[],createdAt:Date.now()};S.starters.push(st)}
-    Object.assign(st,{name:f.name.trim(),mode:f.mode,storage:f.storage,flour:f.flour.trim(),notes:f.notes.trim(),startDate:f.startDate?new Date(f.startDate+'T12:00').getTime():Date.now()});
+    Object.assign(st,{name:f.name.trim(),mode:f.mode,storage:f.storage,flour:f.flour.trim(),notes:f.notes.trim(),guided:f.guided==='1',startDate:f.startDate?new Date(f.startDate+'T12:00').getTime():Date.now()});
     return'#/starter/'+st.id},
   feed(f,id){const st=starter(id);if(num(f.tare)!=null)st.jarTare=num(f.tare);st.log.push({id:uid(),type:'feed',t:f.t?new Date(f.t).getTime():Date.now(),discard:num(f.discard),kept:num(f.kept),flour:num(f.flour),water:num(f.water),place:f.place,temp:toF(num(f.temp))});
     toast('Feeding saved');return'#/starter/'+id},
@@ -683,6 +827,13 @@ const FORMS={
     return'#/bakes'},
   chat(f,tk){if(aiBusy||!f.q.trim())return null;const[k,i]=tk==='general'?[]:tk.split(':');(AI.threads[tk]=AI.threads[tk]||[]).push({role:'user',content:f.q.trim()});saveAI();chatSend(tk,k,i);return location.hash},
   ai(){aiReadForm();if(!aiReady()){toast(!AI.key?'Enter your API key':!AI.model?'Choose a model':'Enter the API address');return null}toast('AI settings saved');return'#/chat'},
+  wiz(f,id){const st=starter(id);if(!W||W.id!==id)return'#/starter/'+id;Object.assign(W.v,f);const{steps:A,plan}=wizPlan(st,W.v),x=A[Math.min(W.i,A.length-1)];
+    if(W.i>=A.length-1){const log=!x.stop&&!plan.none;if(log){wizFinish(st,W.v,plan);toast(plan.stir?'Stir logged':'Feed logged')}W=null;return'#/starter/'+id}
+    W.i++;window.scrollTo(0,0);return location.hash},
+  remind(f){const R=S.settings.remind;R.on=f.on==='1';['feed','check','fridge','bake'].forEach(k=>R[k]=k in f);R.feedTime=f.feedTime||'08:00';R.quietFrom=f.quietFrom||'';R.quietTo=f.quietTo||'';
+    if(R.on&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission().then(()=>bgSetup().then(render));else bgSetup().then(()=>{if(location.hash==='#/reminders')render()});toast('Reminders saved');return'#/reminders'},
+  remindNew(f,id){const t=f.at?new Date(f.at).getTime():Date.now()+(+f.inH||4)*H;if(!(t>Date.now())){alert('Pick a time in the future.');return null}
+    S.reminders.push({id:uid(),starterId:id||'',t,text:f.text.trim()});if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();toast('Reminder set for '+soon(t));return id?'#/starter/'+id:'#/reminders'},
   settings(f){const old=S.settings.prooferTemp;S.settings.unit=f.unit;S.settings.prooferTemp=toF(num(f.prooferTemp))??old;S.settings.equip=Object.fromEntries(EQUIP.map(e=>[e[0],'eq_'+e[0] in f]));toast('Settings saved');return'#/more'},
 };
 document.addEventListener('submit',e=>{const fm=e.target.closest('form[data-form]');if(!fm)return;e.preventDefault();
@@ -702,7 +853,10 @@ const ACT={
   stepDone(d){const b=batch(d.id);b.done[d.key]=Date.now();if(b.timer&&b.timer.key===d.key)b.timer=null;
     if(!curStep(b)){b.status='done';b.finishedAt=Date.now();return'#/bake/'+b.id+'/result'}},
   stepUndo(d){const b=batch(d.id),k=Object.keys(b.done).sort((a,c)=>b.done[c]-b.done[a])[0];if(k){delete b.done[k];b.status='active'}},
-  notify(){Notification.requestPermission().then(render)},
+  notify(){Notification.requestPermission().then(()=>bgSetup().then(render))},
+  notifyTest(){if(!('Notification'in window)||Notification.permission!=='granted'){toast('Allow notifications first');return}notify('Crumb test','This is what a reminder looks like.','test','#/reminders')},
+  wizBack(){if(W&&W.i)W.i--;window.scrollTo(0,0)},
+  remDone(d){S.reminders=S.reminders.filter(r=>r.id!==d.id)},
   beepTest(){beep()},
   export(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='crumb-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()},
   wipe(){if(confirm('Erase all starters, bakes and recipes from this device? This cannot be undone.')){S=fresh();AI=aiFresh();saveAI();return'#/today'}},
@@ -730,12 +884,16 @@ function tick(){const now=Date.now();
   S.batches.forEach(b=>{const t=b.timer;if(t&&!t.fired&&now>=t.end){t.fired=true;fired=true;const s=steps(b).find(x=>x.key===t.key);const msg=`${b.name}: ${s?s.title:'timer'} is up`;
     beep();toast(msg);
     try{if('Notification'in window&&Notification.permission==='granted'){navigator.serviceWorker&&navigator.serviceWorker.ready.then(r=>r.showNotification('Crumb',{body:msg,icon:'icon-192.png',tag:b.id})).catch(()=>new Notification('Crumb',{body:msg}))}}catch(e){}}});
-  if(fired)save()}
+  if(fired)save();
+  if(now-lastRem>10000){lastRem=now;fireReminders()}}
+let lastRem=0;
 setInterval(tick,1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 document.addEventListener('pointerdown',audio,{once:true});
 
-if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.url)location.hash=e.data.url})}
+bgSetup().then(writeSchedule);
 lastHash=location.hash;render();
 </script>
 </body>
