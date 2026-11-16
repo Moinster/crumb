@@ -51,6 +51,7 @@ input[type=text],input[type=number],input[type=datetime-local],input[type=date],
   width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:16px system-ui,sans-serif}
 textarea{min-height:80px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips label{position:relative}
 .chips input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0}
@@ -159,7 +160,23 @@ const PLACE=[['counter','Counter'],['proofer','Proofer'],['fridge','Fridge']];
 const lab=(arr,v)=>(arr.find(a=>a[0]===v)||[,''])[1];
 
 function stDay(st){return Math.floor((day0(Date.now())-day0(st.startDate))/D)+1}
+// How a starter is fed. "fixed" = discard X, add Y flour and Z water every time; "ratio" = keep an amount and feed a multiple of it.
+const routineOf=st=>st.routine||{style:'ratio'};
+const routineText=r=>r.style==='fixed'?`${r.discard?`Discard ${r.discard} g, then add`:'Add'} ${r.flour} g flour + ${r.water} g water`:'By ratio';
+function estKept(st,r){const lf=lastOf(st,'feed');if(!lf||lf.kept==null)return null;const k=lf.kept+lf.flour+lf.water-(r.discard||0);return k>0?Math.round(k):null}
+// Dried starter packet: five steps over three days, each waiting on the one before.
+const PK=[{d:0,w:60,f:0,wait:0,day:1,t:'Soak the dried starter in 60 g lukewarm water',n:'Stir it 4 times over the next 3 hours.'},
+  {d:0,w:0,f:30,wait:3,day:1,t:'Add 30 g flour',n:'Leave it at least 24 hours somewhere warm. Look for bubbles on the surface.'},
+  {d:0,w:90,f:90,wait:24,day:2,t:'Feed 90 g flour + 90 g water',n:'Leave it 8–10 hours. You should see bubbles on the surface.'},
+  {d:180,w:90,f:90,wait:9,day:2,t:'Discard 180 g, then feed 90 g flour + 90 g water',n:'Leave it another 8–10 hours. It should start to grow in volume.'},
+  {d:180,w:90,f:90,wait:9,day:3,t:'Discard 180 g, then feed 90 g flour + 90 g water',n:'After this feed it moves to its regular routine. Once it doubles, you can bake with it.'}];
+const isPacket=st=>st.mode==='new'&&st.build==='packet';
+function pkStatus(st){const n=Math.min(st.log.filter(l=>l.type==='feed').length,PK.length-1),k=PK[n],lf=lastOf(st,'feed'),at=lf?lf.t+k.wait*H:0,due=Date.now()>=at;
+  return{due,lv:due?'warn':'good',label:due?'Next step due':'Waiting',line:`Day ${k.day} · ${due?k.t:'Next step '+soon(at)}`,task:k.t,day:k.day,act:'feed',pk:k,n,at}}
+function afterFeed(st){if(!isPacket(st)||st.log.filter(l=>l.type==='feed').length<PK.length)return false;
+  st.mode='established';if(routineOf(st).style!=='fixed')st.routine={style:'fixed',discard:180,flour:90,water:90};return true}
 function stStatus(st){
+  if(isPacket(st))return pkStatus(st);
   const lf=lastOf(st,'feed'),now=Date.now();
   if(st.mode==='new'){
     const d=stDay(st),did=st.log.some(l=>(l.type==='feed'||l.type==='stir')&&day0(l.t)===day0(now));
@@ -221,7 +238,7 @@ function starterTips(st,c){
   if(c.texture==='webby')add('good','Good structure','A stretchy, webby texture shows strong gluten and plenty of gas.');
   if(temp!=null&&temp>85)add('warn','Too warm: '+T(temp),`Above ${T(85)} bacteria outpace yeast, giving sour flavour and a fast collapse. Aim for ${T(75)}–${T(80)}.`);
   if(c.amount!=null&&c.amount>250)add('info','That is a lot of starter',`About ${c.amount} g in the jar. Keep 30–50 g and discard the rest before feeding to save flour.`);
-  if(ratio!=null&&ratio<.8&&(c.rise==='fallen'||c.surface==='hooch'))add('info','The last feed was small',`You fed less flour than the starter you kept. Feed at least equal weights of starter, flour and water.`);
+  if(ratio!=null&&ratio<.8&&routineOf(st).style!=='fixed'&&(c.rise==='fallen'||c.surface==='hooch'))add('info','The last feed was small',`You fed less flour than the starter you kept. Feed at least equal weights of starter, flour and water.`);
   if(!isNew){const prev=st.log.filter(l=>l.type==='check'&&l.t<c.t).sort((a,b)=>b.t-a.t).slice(0,2);
     const weak=x=>(x.rise==='none'||x.rise==='some')&&(x.hrs??9)>=6;
     if(prev.length===2&&weak(c)&&prev.every(weak)&&place!=='fridge')add('warn','Three weak check-ins in a row',`Time for a reset: for three days, feed twice a day at 1:2:2 with a fifth of the flour as whole wheat or rye, kept at ${T(78)}.`)}
@@ -362,12 +379,17 @@ V.today=()=>{
 
 V.starters=()=>`<h1>Starters</h1>${S.starters.length?S.starters.map(starterCard).join(''):'<div class="card empty">No starters yet.</div>'}<a class="btn pri full" href="#/starter/new">Add a starter</a>`;
 
-function starterForm(st){const n=!st;st=st||{name:'',flour:'Whole wheat',mode:'established',storage:'counter',startDate:Date.now(),notes:''};
+function starterForm(st){const n=!st;st=st||{name:'',flour:'Whole wheat',mode:'established',storage:'counter',startDate:Date.now(),notes:'',routine:{style:'fixed',discard:100,flour:50,water:50}};const rt=routineOf(st);
   return `${back(n?'#/starters':'#/starter/'+st.id,'Back')}<h1>${n?'Add a starter':'Edit starter'}</h1>
   <form data-form="starter" data-id="${st.id||''}">
   <label class="f">Name</label><input type="text" name="name" required maxlength="40" value="${esc(st.name)}" placeholder="e.g. Doughy Parton">
   <label class="f">Stage</label>${chips('mode',[['new','Starting from scratch'],['established','Already active']],st.mode,true)}
   <label class="f">Day 1 date <span class="hint">only for a starter made from scratch</span></label><input type="date" name="startDate" value="${localInput(st.startDate).slice(0,10)}">
+  <label class="f">Starting method <span class="hint">only when starting a new one</span></label>${chips('build',[['kneadace','Flour and water, 7–12 days'],['packet','Dried starter packet, 3 days']],st.build||'kneadace',true)}
+  <label class="f">Feeding routine <span class="hint">how your instructions describe a regular feed</span></label>${chips('rstyle',[['fixed','Fixed amounts'],['ratio','By ratio']],rt.style,true)}
+  <div class="grid3"><div><label class="f">Discard (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="rd" value="${rt.discard??''}"></div><div><label class="f">Flour (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="rf" value="${rt.flour??''}"></div><div><label class="f">Water (g)</label><input type="number" inputmode="decimal" step="any" min="0" name="rw" value="${rt.water??''}"></div></div>
+  <div class="chips" style="margin-top:8px"><button class="btn sm" type="button" data-fill="180,90,90">Discard 180, add 90 + 90</button><button class="btn sm" type="button" data-fill="100,50,50">Discard 100, add 50 + 50</button></div>
+  <p class="sub"><b>Fixed amounts:</b> every feed is “discard this much, add this much flour and water”, as most kit instructions put it. <b>By ratio:</b> you choose how much starter to keep and feed a multiple of it, such as 1:1:1.</p>
   <label class="f">Where it lives <span class="hint">sets the feeding schedule once established</span></label>${chips('storage',[['counter','Counter, fed daily'],['fridge','Fridge, fed every 3–5 days']],st.storage,true)}
   <label class="f">Flour</label><input type="text" name="flour" maxlength="40" value="${esc(st.flour)}">
   <label class="f">Guided mode <span class="hint">step-by-step feeds with explanations; switch it off any time</span></label>${chips('guided',[['1','On'],['0','Off']],n||isGuided(st)?'1':'0',true)}
@@ -388,6 +410,7 @@ V.starter=id=>{const st=starter(id);if(!st)return V.starters();
   <div class="card"><dl class="kv">
     <dt>${st.mode==='new'?'Stage':'Lives'}</dt><dd>${st.mode==='new'?'Day '+s.day+' of building':st.storage==='fridge'?'In the fridge':'On the counter'}</dd>
     <dt>Flour</dt><dd>${esc(st.flour||'–')}</dd>
+    <dt>${st.mode==='new'?'Method':'Routine'}</dt><dd>${st.mode==='new'?(st.build==='packet'?'Dried starter packet':'Flour and water'):routineText(routineOf(st))}</dd>
     <dt>Last fed</dt><dd>${lf?ago(lf.t):'never'}</dd>
     ${st.mode==='new'?`<dt>Today</dt><dd>${esc(s.line.split(' · ')[1])}</dd>`:`<dt>Next</dt><dd>${esc(s.line.split(' · ')[1]||'')}</dd>`}
   </dl>${st.notes?`<p class="sub">${esc(st.notes)}</p>`:''}
@@ -395,7 +418,7 @@ V.starter=id=>{const st=starter(id);if(!st)return V.starters();
   ${isGuided(st)?`<p class="sub"><a href="#/starter/${id}/feed">Log a feed without the guide</a></p>`:''}
   <div class="btns"><a class="btn" href="#/chat/starter/${id}">Ask Crumb</a><a class="btn" href="#/starter/${id}/remind">Remind me</a></div>
   <label class="check"><input type="checkbox" data-toggle="guided" data-id="${id}" ${isGuided(st)?'checked':''}><span><b>Guided mode</b><br><span class="hint">Step-by-step feeds with explanations</span></span></label>
-  ${st.mode==='new'&&s.day>=7?`<div class="btns"><button class="btn" data-act="graduate" data-id="${id}">Mark as established</button></div><p class="sub">Do this once it doubles within 6 hours of a feed.</p>`:''}</div>
+  ${st.mode==='new'&&!s.pk&&s.day>=7?`<div class="btns"><button class="btn" data-act="graduate" data-id="${id}">Mark as established</button></div><p class="sub">Do this once it doubles within 6 hours of a feed.</p>`:''}</div>
   ${c?`<h2>Guidance from ${when(c.t)}</h2>${tipsHtml(c.tips)}`:`<h2>Guidance</h2><div class="card sub">Do a check-in a few hours after feeding and you will get advice based on what you see.</div>`}
   <h2>History</h2><div class="card">${log.length?log.map(l=>`<div class="log row"><div class="grow"><div class="sub">${when(l.t)}</div>${desc(l)}</div><button class="x" aria-label="Delete entry" data-act="delLog" data-id="${id}" data-log="${l.id}">×</button></div>`).join(''):'<span class="sub">Nothing logged yet.</span>'}</div>`};
 
@@ -403,11 +426,15 @@ V.feed=id=>{const st=starter(id);if(!st)return V.starters();const s=stStatus(st)
   let d={discard:'',kept:50,flour:50,water:50};
   if(st.mode==='new')d=s.day<=1&&!lf?{discard:0,kept:0,flour:60,water:80}:{discard:100,kept:'',flour:50,water:50};
   else if(lf)d={discard:lf.discard??'',kept:lf.kept??'',flour:lf.flour,water:lf.water};
+  const rt=routineOf(st),fixed=st.mode!=='new'&&rt.style==='fixed';
+  if(s.pk)d={discard:s.pk.d,kept:'',flour:s.pk.f,water:s.pk.w};
+  if(fixed)d={discard:rt.discard,kept:estKept(st,rt)??'',flour:rt.flour,water:rt.water};
   const place=st.storage==='fridge'&&st.mode!=='new'?'counter':(lf?.place&&lf.place!=='fridge'?lf.place:S.settings.equip.proofer?'proofer':'counter');
   return `${back('#/starter/'+id,esc(st.name))}<h1>Feed</h1>
-  ${st.mode==='new'?`<div class="tip"><b>Day ${s.day}</b><p>${esc(s.task)}. Stir well, cover with the cloth and mark the level with the rubber band.</p></div>`:st.storage==='fridge'?'<div class="tip"><b>Fridge routine</b><p>Feed, leave it out for about 2 hours, then put it back in the fridge with the lid on.</p></div>':''}
+  ${st.mode==='new'?`<div class="tip"><b>Day ${s.day}</b><p>${esc(s.task)}. ${s.pk?esc(s.pk.n):'Stir well, cover with the cloth and mark the level with the rubber band.'}</p></div>`:st.storage==='fridge'?'<div class="tip"><b>Fridge routine</b><p>Feed, leave it out for about 2 hours, then put it back in the fridge with the lid on.</p></div>':''}
+  ${fixed?`<div class="tip"><b>Your routine</b><p>${esc(routineText(rt))}. The amounts below are filled in for you.</p></div>`:''}
   <form data-form="feed" data-id="${id}">
-  <details class="card" ${st.mode==='new'?'':'open'}><summary><b>Feeding calculator</b></summary>
+  <details class="card" ${st.mode==='new'||fixed?'':'open'}><summary><b>Feeding calculator</b></summary>
   <p class="sub">Pick a ratio and the amounts below fill in for you. Ratio is starter : flour : water by weight.</p>
   ${chips('ratio',[['1','1:1:1'],['2','1:2:2'],['3','1:3:3'],['5','1:5:5']])}
   <label class="f">Total starter I want after feeding (g) <span class="hint">optional, e.g. what a recipe needs plus 30 g to keep</span></label><input type="number" inputmode="decimal" step="any" min="0" name="target">
@@ -526,6 +553,10 @@ V.guide=()=>`${back('#/more','More')}<h1>Starter guide</h1>
 <p><b>Day 2.</b> Stir, cover, leave another 24 h. Tiny bubbles are a good sign.</p>
 <p><b>Days 3–7 and on.</b> Stir, discard 100 g, add 50 g water then 50 g whole wheat flour, cover. Mark the level with a rubber band.</p>
 <p>Expect it to rise 8–12 h after feeding, then fall before the next feed.</p></div>
+<h2>From a dried starter packet (3 days)</h2><div class="card"><p>Keep it at ${T(75)}–${T(82)}.</p>
+<p><b>Day 1.</b> Soak the packet in 60 g lukewarm filtered water for 3 hours, stirring 4 times. Then mix in 30 g flour and leave at least 24 hours.</p>
+<p><b>Day 2.</b> Once bubbles show, add 90 g flour + 90 g water and leave 8–10 hours. Then discard 180 g and add 90 + 90 again.</p>
+<p><b>Day 3.</b> Discard 180 g, add 90 g water + 90 g flour. This is now the regular feed.</p></div>
 <h2>Ready to bake</h2><div class="card"><p>It is ready when it <b>doubles within 6 hours</b> of a feed. Use it at or just before the peak: domed top, lots of bubbles, pleasant tangy smell.</p></div>
 <h2>Keeping it going</h2><div class="card"><p><b>Baking most days:</b> keep it on the counter and feed once a day.</p><p><b>Baking less often:</b> feed, wait about 2 hours, then refrigerate with the lid on. Feed every 3–5 days. Give it one or two counter feeds before baking.</p></div>
 <h2>Troubleshooting</h2>
@@ -552,10 +583,11 @@ function schedule(days=1){const R=S.settings.remind,now=Date.now(),out=[];if(!R.
   const add=(id,t,title,body,url,q=true)=>out.push({id,t:q?quiet(t):t,title,body,url});
   S.starters.forEach(st=>{const lf=lastOf(st,'feed'),u='#/starter/'+st.id+(isGuided(st)?'/guide':'');
     if(R.feed){
-      if(st.mode==='new'){const s=stStatus(st);for(let i=0;i<days;i++){const off=(s.due?0:1)+i,dn=s.day+off,t=atTime(now+off*D,R.feedTime);
+      if(isPacket(st)){const s=stStatus(st);if(lf)add(`feed:${st.id}:pk${s.n}:${lf.t}`,s.at,`Next step for ${st.name}`,s.task+'.',u)}
+      else if(st.mode==='new'){const s=stStatus(st);for(let i=0;i<days;i++){const off=(s.due?0:1)+i,dn=s.day+off,t=atTime(now+off*D,R.feedTime);
         add(`feed:${st.id}:${day0(t)}`,t,`Time to ${dn===2?'stir':'feed'} ${st.name}`,`Day ${dn} of building your starter.`,u)}}
       else if(lf)add(`feed:${st.id}:${lf.t}`,lf.t+(st.storage==='fridge'?96:24)*H,`Time to feed ${st.name}`,st.storage==='fridge'?'It has been 4 days since its last feed.':'It was last fed a day ago.',u)}
-    if(lf&&R.check&&lf.place!=='fridge'&&!st.log.some(l=>l.type==='check'&&l.t>lf.t))add(`check:${st.id}:${lf.t}`,lf.t+peakHrs(st,lf)*H,`Check on ${st.name}`,st.mode==='new'?'See how far it has risen and log what you find.':'It should be near its peak. Log what you see for advice.','#/starter/'+st.id+'/check');
+    if(lf&&R.check&&lf.place!=='fridge'&&!(isPacket(st)&&stStatus(st).n<3)&&!st.log.some(l=>l.type==='check'&&l.t>lf.t))add(`check:${st.id}:${lf.t}`,lf.t+peakHrs(st,lf)*H,`Check on ${st.name}`,st.mode==='new'?'See how far it has risen and log what you find.':'It should be near its peak. Log what you see for advice.','#/starter/'+st.id+'/check');
     if(lf&&R.fridge&&st.mode!=='new'&&st.storage==='fridge'&&lf.place!=='fridge')add(`fridge:${st.id}:${lf.t}`,lf.t+2*H,`Put ${st.name} back in the fridge`,'It has had about 2 hours out since feeding.','#/starter/'+st.id)});
   S.reminders.forEach(r=>{const st=starter(r.starterId);add('man:'+r.id,r.t,r.text,st?st.name:'Your reminder',st?'#/starter/'+st.id:'#/today',false)});
   return out.sort((a,b)=>a.t-b.t)}
@@ -614,7 +646,8 @@ function phase(d){return d<=1?['Day 1: mixing','Flour and water wake up the wild
   :d<=10?[`Day ${d}: yeast taking over`,'A regular rise and fall after each feed should be appearing, with a tangy, yeasty smell.','Rising within 8–12 h of a feed, then falling back. It is ready when it doubles within 6 h.']
   :[`Day ${d}: nearly there`,'Some starters take two weeks or more, especially in a cool kitchen.',`If it is not doubling yet, keep it at ${T(75)}–${T(80)} and keep feeding. Patience is the fix.`]}
 function guideCard(st){const s=stStatus(st),lf=lastOf(st,'feed'),now=Date.now();let t,b,n='';
-  if(st.mode==='new')[t,b,n]=phase(s.day);
+  if(s.pk){t=`Day ${s.day} of 3: dried starter packet`;b=s.due?s.task+'.':`Nothing to do yet. Next step ${soon(s.at)}: ${s.task.toLowerCase()}.`;n=s.n?PK[s.n-1].n:`Keep it warm, ${T(75)}–${T(82)} is ideal.`}
+  else if(st.mode==='new')[t,b,n]=phase(s.day);
   else if(!lf){t='Start with a feed';b='Crumb needs one feed logged to work out your schedule. The guided feed walks you through it, one step at a time.'}
   else{const gap=(now-lf.t)/D,pk=lf.t+peakHrs(st,lf)*H,chk=st.log.some(l=>l.type==='check'&&l.t>lf.t);
     if(gap>10){t='Waking it up after a break';b=`It has been ${Math.round(gap)} days since the last feed. Expect dark liquid on top and a sharp smell. It is hungry, not dead.`;n='Plan on 2–3 feeds about 12 hours apart at room temperature. It is back when it doubles within 6 hours of a feed.'}
@@ -627,33 +660,41 @@ function guideCard(st){const s=stStatus(st),lf=lastOf(st,'feed'),now=Date.now();
 let W=null;
 function wizPlan(st,v){const s=stStatus(st),lf=lastOf(st,'feed'),isNew=st.mode==='new',d=s.day,A=[],R=S.settings.remind;
   const kit=S.settings.equip.proofer,fl=esc(st.flour||'flour'),li=a=>'<ul class="steps">'+a.filter(Boolean).map(x=>`<li>${x}</li>`).join('')+'</ul>',why=x=>`<p class="sub"><b>Why:</b> ${x}</p>`;
+  if(s.pk&&!s.due)return{plan:{none:true},steps:[{t:'Nothing to do yet',h:`<p>The next step is ${soon(s.at)}: ${esc(s.task.toLowerCase())}.</p><p class="sub">${esc(PK[s.n-1].n)}</p>`}]};
   if(isNew&&!s.due)return{plan:{none:true},steps:[{t:'Done for today',h:`<p>Day ${d} is already logged. There is nothing more to do until tomorrow${R.on&&R.feed?' around '+clockTime(atTime(Date.now(),R.feedTime)):''}.</p>${why('One feed a day at about the same time is all a new starter needs. Extra feeds dilute it and slow it down.')}`}]};
-  const first=isNew&&d<=1,stir=isNew&&d===2;
+  const P=s.pk,rt=routineOf(st),fixed=!isNew&&rt.style==='fixed',first=P?s.n===0:isNew&&d<=1,stir=!P&&isNew&&d===2;
   const keep=first?0:isNew?null:(num(v.kept)??lf?.kept??50),ratio=num(v.ratio)??(lf&&lf.kept?[1,2,3,5].reduce((a,x)=>Math.abs(x-lf.flour/lf.kept)<Math.abs(a-lf.flour/lf.kept)?x:a,1):1);
   const plan={stir,discard:first?0:isNew?100:null,kept:isNew?null:keep,flour:first?60:isNew?50:Math.round(keep*ratio),water:first?80:isNew?50:Math.round(keep*ratio)};
-  const gap=lf?(Date.now()-lf.t)/D:0,cool=`If your kitchen is cool, use warm water, about ${T(85)}.`;
+  if(P)Object.assign(plan,{discard:P.d,kept:null,flour:P.f,water:P.w});
+  if(fixed)Object.assign(plan,{discard:rt.discard||0,kept:estKept(st,rt),flour:rt.flour,water:rt.water});
+  const byAmt=isNew||fixed,gap=lf?(Date.now()-lf.t)/D:0,cool=`If your kitchen is cool, use warm water, about ${T(85)}.`;
   A.push({t:'Get ready',h:(stir?`<p>Day 2 is only a stir. No flour or water today.</p>${why('Stirring adds oxygen and spreads the microbes through the mix.')}`
+    :P&&first?`<p>Today you wake up the dried starter with water, then add a little flour in about 3 hours.</p>${why('The dried flakes hold dormant yeast and bacteria. Soaking brings them back to life before their first meal.')}`
+    :P?`<p>Day ${d}: ${esc(s.task.toLowerCase())}.</p>${why('Each feed gives the reviving culture more food, so its numbers build up quickly.')}`
     :first?`<p>Today you mix flour and water, and that is all.</p>${why('Wild yeast and bacteria already live on the flour. Water wakes them up.')}`
-    :`<p>${isNew?`Day ${d}: discard and feed.`:'A feed takes about two minutes.'}</p>${why('Feeding gives the culture fresh food and dilutes the acid it has made. Discarding first keeps the amount small, so each feed is a proper meal.')}`)
+    :`<p>${isNew?`Day ${d}: discard and feed.`:fixed?esc(routineText(rt))+'. It takes about two minutes.':'A feed takes about two minutes.'}</p>${why('Feeding gives the culture fresh food and dilutes the acid it has made. Discarding first keeps the amount small, so each feed is a proper meal.')}`)
     +(!isNew&&gap>10?`<div class="tip warn"><b>It has been ${Math.round(gap)} days</b><p>Dark liquid on top and a sharp smell are normal after a break. Pour the liquid off. It may take 2–3 feeds, 12 hours apart, to get back to full strength.</p></div>`:'')
-    +'<p><b>You need:</b></p>'+li(['A kitchen scale','A spatula or spoon',!stir&&`${plan.flour} g ${fl}`,!stir&&`${plan.water} g water. Tap water is fine; if yours smells of chlorine, let it stand for an hour first`,first&&'A clean jar, a cloth and a rubber band',!first&&!stir&&'A bin or a discard jar',!isNew&&st.storage==='fridge'&&'Take the starter out of the fridge. It does not need to warm up first'])});
-  if(!first)A.push({t:'Look and smell first',h:`<p>Before you touch it, see what it has done since the last feed. This is saved as a check-in, and it is how Crumb spots problems early.</p>
+    +'<p><b>You need:</b></p>'+li(['A kitchen scale','A spatula or spoon',P&&first&&'The dried starter packet',!stir&&plan.flour>0&&`${plan.flour} g ${fl}`,!stir&&plan.water>0&&(P?`${plan.water} g lukewarm filtered water`:`${plan.water} g water. Tap water is fine; if yours smells of chlorine, let it stand for an hour first`),first&&'A clean jar, a cloth and a rubber band',!first&&!stir&&plan.discard!==0&&'A bin or a discard jar',!isNew&&st.storage==='fridge'&&'Take the starter out of the fridge. It does not need to warm up first'])});
+  if(!first&&!(P&&s.n<2))A.push({t:'Look and smell first',h:`<p>Before you touch it, see what it has done since the last feed. This is saved as a check-in, and it is how Crumb spots problems early.</p>
     <label class="f">Rise since the last feed <span class="hint">optional</span></label>${chips('rise',RISE,v.rise)}<label class="f">Smell</label>${chips('smell',SMELL,v.smell)}<label class="f">Surface</label>${chips('surface',SURFACE,v.surface||'normal')}`});
   if(v.surface==='mold'||v.surface==='pink'){A.push({t:'Do not feed this starter',stop:true,h:`<div class="tip bad"><b>Throw it away</b><p>Fuzzy mold or pink or orange streaks mean it is contaminated. It cannot be rescued by feeding.</p></div>${li(['Discard all of it','Wash the jar and spatula in very hot soapy water','Start a new one, or use a backup if you have one'])}`});return{plan,steps:A}}
   if(stir){A.push({t:'Stir',h:li(['Stir well for about 30 seconds, right down to the bottom','Scrape the sides down so the level is easy to see'])+'<p class="sub">A few tiny bubbles are a good sign. None is also fine.</p>'});
     A.push({t:'Cover and leave',h:li(['Cover with the cloth','Leave it on the counter for another 24 hours',kit?`Your proofer at ${T(S.settings.prooferTemp)} will keep it at the ideal temperature`:`Aim for ${T(75)}–${T(80)}. A cool kitchen just makes it slower`])})}
   else{
-    if(!isNew)A.push({t:'How much to keep',h:`<p>You keep a small amount and feed that. The rest is discard.</p><label class="f">Starter to keep (g)</label><input type="number" inputmode="decimal" step="any" min="5" name="kept" required value="${keep}">
+    if(!byAmt)A.push({t:'How much to keep',h:`<p>You keep a small amount and feed that. The rest is discard.</p><label class="f">Starter to keep (g)</label><input type="number" inputmode="decimal" step="any" min="5" name="kept" required value="${keep}">
       <label class="f">Feed ratio <span class="hint">starter : flour : water</span></label>${chips('ratio',[['1','1:1:1'],['2','1:2:2'],['3','1:3:3'],['5','1:5:5']],String(ratio),true)}
       <p class="sub">1:1:1 peaks in about 4–6 hours when warm and suits a daily feed. A bigger ratio takes longer, which helps overnight or if it keeps collapsing before the next feed.</p>`});
-    if(!first)A.push({t:isNew?'Discard 100 g':`Discard down to ${keep} g`,h:li(['Stir it down first',isNew?'Spoon out 100 g and throw it away':st.jarTare!=null?`Spoon starter out until the scale, with the jar on it, reads <b>${Math.round(st.jarTare+keep)} g</b>. Your empty jar weighs ${st.jarTare} g`:`Easiest way: put a clean jar on the scale, zero it, and spoon in <b>${keep} g</b> of starter. The rest is discard`,'Put discard in the bin or a discard jar, not down the drain. It sets like glue'])+why('Without discarding, the jar doubles every day and each feed gets too small to keep the yeast going.')});
-    A.push({t:`Add ${plan.water} g water`,h:li(['Put the jar on the scale and zero it',`Pour in <b>${plan.water} g</b> water`,'Stir until it looks milky with no lumps'])+`<p class="sub">Water first is easier to mix. ${cool}</p>`});
-    A.push({t:`Add ${plan.flour} g flour`,h:li(['Zero the scale again',`Add <b>${plan.flour} g</b> ${fl}`,'Mix until there is no dry flour','Scrape the sides down and level the top'])});
-    A.push({t:'Mark and cover',h:li(['Put the rubber band around the jar at the level of the starter','Note the time. Crumb logs it when you finish',st.storage==='fridge'&&!isNew?'Cover it loosely for now. The lid goes on when it returns to the fridge':'Cover with the cloth so gas can escape'])+why('The band is how you measure the rise. “Doubled” means twice as far above the bottom as the band.')});
+    if(!first&&plan.discard!==0)A.push({t:byAmt?`Discard ${plan.discard} g`:`Discard down to ${keep} g`,h:li(['Stir it down first',byAmt?`Put the jar on the scale and zero it. Spoon starter out until the scale reads <b>−${plan.discard} g</b>`:st.jarTare!=null?`Spoon starter out until the scale, with the jar on it, reads <b>${Math.round(st.jarTare+keep)} g</b>. Your empty jar weighs ${st.jarTare} g`:`Easiest way: put a clean jar on the scale, zero it, and spoon in <b>${keep} g</b> of starter. The rest is discard`,'Put discard in the bin or a discard jar, not down the drain. It sets like glue'])+why('Without discarding, the jar doubles every day and each feed gets too small to keep the yeast going.')});
+    if(P&&first){A.push({t:'Soak the dried starter',h:li(['Empty the packet into the jar','Put the jar on the scale and zero it','Pour in <b>60 g</b> lukewarm filtered water','Stir until all the flakes are covered'])});
+      A.push({t:'Cover loosely',h:li(['Rest the lid on loosely, or use a cloth','Stir it 4 times over the next 3 hours'])+why('Stirring helps the flakes dissolve evenly so no dry pockets are left.')})}
+    else if(plan.water>0)A.push({t:`Add ${plan.water} g water`,h:li(['Put the jar on the scale and zero it',`Pour in <b>${plan.water} g</b> ${P?'lukewarm filtered ':''}water`,'Stir until it looks milky with no lumps'])+`<p class="sub">Water first is easier to mix. ${cool}</p>`});
+    if(plan.flour>0)A.push({t:`Add ${plan.flour} g flour`,h:li(['Zero the scale again',`Add <b>${plan.flour} g</b> ${fl}`,'Mix until there is no dry flour','Scrape the sides down and level the top'])});
+    if(!(P&&first))A.push({t:'Mark and cover',h:li(['Put the rubber band around the jar at the level of the starter','Note the time. Crumb logs it when you finish',st.storage==='fridge'&&!isNew?'Cover it loosely for now. The lid goes on when it returns to the fridge':'Cover with the cloth so gas can escape'])+why('The band is how you measure the rise. “Doubled” means twice as far above the bottom as the band.')});
     A.push({t:'Where is it resting?',h:`<p>${kit?`Your proofer at ${T(S.settings.prooferTemp)} is ideal.`:`Somewhere steady at ${T(75)}–${T(80)} is ideal: the oven with only the light on, or the top of the fridge.`} Temperature is the biggest factor in how fast it rises.</p>
       <label class="f">Resting place</label>${chips('place',PLACE.slice(0,2),v.place||(kit?'proofer':'counter'),true)}${tempField('temp','Temperature there',v.temp!==undefined&&v.temp!==''?toF(num(v.temp)):(kit?S.settings.prooferTemp:null),'optional')}`})}
-  const pk=stir?null:peakHrs(st,{kept:plan.kept,flour:plan.flour,temp:toF(num(v.temp))}),rem=R.on?(R.check&&!stir?`Crumb will remind you to check on it around ${clockTime(Date.now()+pk*H)}.`:R.feed?'Crumb will remind you when the next feed is due.':''):'Reminders are off. You can turn them on under More.';
-  A.push({t:'What happens next',h:(isNew?`<p>${esc(phase(stir?2:d)[2])}</p>`+li([stir?'Tomorrow is the first discard and feed':d>=7?'Check it 4–6 hours from now. Once it doubles within 6 hours, it is ready to bake with':'Expect any rise 8–12 hours from now, then a fall','Feed again at about the same time tomorrow'])
+  const pk=stir?null:peakHrs(st,{kept:plan.kept,flour:plan.flour,temp:toF(num(v.temp))}),rem=R.on?(R.check&&!stir&&!(P&&s.n<3)?`Crumb will remind you to check on it around ${clockTime(Date.now()+pk*H)}.`:R.feed?'Crumb will remind you when the next step is due.':''):'Reminders are off. You can turn them on under More.';
+  A.push({t:'What happens next',h:(P?li([esc(P.n),s.n<PK.length-1?'Next: '+esc(PK[s.n+1].t.toLowerCase())+(PK[s.n+1].wait>=24?', tomorrow':`, in about ${PK[s.n+1].wait} hours`):'From now on: discard 180 g, add 90 g water and 90 g flour. Once a day on the counter, or twice a week in the fridge'])
+    :isNew?`<p>${esc(phase(stir?2:d)[2])}</p>`+li([stir?'Tomorrow is the first discard and feed':d>=7?'Check it 4–6 hours from now. Once it doubles within 6 hours, it is ready to bake with':'Expect any rise 8–12 hours from now, then a fall','Feed again at about the same time tomorrow'])
     :li([`It should peak in roughly ${hrsRange(pk)}`,'At the peak it has doubled, the top is domed and bubbly, and it smells tangy','That is the moment to bake with it',st.storage==='fridge'?'Not baking? Leave it out for 2 hours, then back in the fridge with the lid on':'Not baking? Just feed it again tomorrow']))+`<p class="sub">${rem}</p>`});
   return{plan,steps:A}}
 function wizFinish(st,v,plan){const now=Date.now(),lf=lastOf(st,'feed');
@@ -684,7 +725,8 @@ Rules:
 - Timings are estimates; tell them what to look for in the dough or starter, not only the clock.
 - Fuzzy mold or pink or orange streaks on a starter means discard it. Never suggest rescuing it.`;
 function starterCtx(st){const s=stStatus(st),[h]=health(st),L=[];
-  L.push(`Starter "${st.name}": ${st.mode==='new'?`being built from scratch, day ${s.day} (method: day 1 mix 80 g water + 60 g whole wheat; day 2 stir; from day 3 discard 100 g and feed 50 g water + 50 g flour daily; ready when it doubles within 6 h of a feed)`:`established, kept ${st.storage==='fridge'?'in the fridge (fed every 3-5 days)':'on the counter (fed daily)'}`}. Flour: ${st.flour||'not recorded'}. Status: ${s.line}. Health from last check-in: ${h}.`);
+  L.push(`Starter "${st.name}": ${s.pk?`being started from a dried starter packet, day ${s.day} of 3, following the packet leaflet (soak the packet in 60 g lukewarm water for 3 h; add 30 g flour and wait 24 h; feed 90 g flour + 90 g water and wait 8-10 h; discard 180 g and feed 90 + 90, wait 8-10 h; repeat; then a regular routine of discard 180 g, add 90 + 90). Next step: ${s.task}`:st.mode==='new'?`being built from scratch, day ${s.day} (method: day 1 mix 80 g water + 60 g whole wheat; day 2 stir; from day 3 discard 100 g and feed 50 g water + 50 g flour daily; ready when it doubles within 6 h of a feed)`:`established, kept ${st.storage==='fridge'?'in the fridge (fed every 3-5 days)':'on the counter (fed daily)'}`}. Flour: ${st.flour||'not recorded'}. Status: ${s.line}. Health from last check-in: ${h}.`);
+  if(st.mode!=='new'&&routineOf(st).style==='fixed')L.push(`Feeding routine, from the user's own instructions: ${routineText(routineOf(st)).toLowerCase()} at every feed. Work within this routine and speak in these amounts. Do not tell them to switch to a ratio unless they ask.`);
   if(st.jarTare!=null)L.push(`Empty jar weighs ${st.jarTare} g.`);
   if(st.notes)L.push(`Notes: ${st.notes}`);
   const fs=st.log.filter(l=>l.type==='feed').sort((a,b)=>b.t-a.t).slice(0,3);
@@ -788,8 +830,10 @@ function ratio(){const f=document.querySelector('form[data-form=feed]'),el=docum
   const k=num(f.kept.value),fl=num(f.flour.value),w=num(f.water.value);
   if(!(fl&&w)){el.textContent='';return}
   const r1=x=>(x/k).toFixed(1).replace('.0',''),tp=toF(num(f.temp.value)),pl=f.place.value;
-  let txt=k?`Ratio 1:${r1(fl)}:${r1(w)} (starter : flour : water) · ${Math.round(w/fl*100)}% hydration · ${Math.round(k+fl+w)} g in the jar after feeding.`:`${Math.round(w/fl*100)}% hydration. Enter the starter kept to see the ratio.`;
+  const st=starter(f.dataset.id),fx=st&&(st.mode==='new'||routineOf(st).style==='fixed'); // fixed-amount routines do not think in ratios
+  let txt=k?(fx?`${Math.round(k+fl+w)} g in the jar after feeding.`:`Ratio 1:${r1(fl)}:${r1(w)} (starter : flour : water) · ${Math.round(w/fl*100)}% hydration · ${Math.round(k+fl+w)} g in the jar after feeding.`):fx?'':`${Math.round(w/fl*100)}% hydration. Enter the starter kept to see the ratio.`;
   if(k&&pl!=='fridge'){const base=interp(fl/k,[[.5,4],[1,5],[2,7],[3,9],[5,11],[10,14]])*interp(tp??75,BULK)/5;txt+=` Expect a peak in roughly ${hrsRange(base)}${tp!=null?' at '+T(tp):' at room temperature'}.`}
+  if(k&&fx)txt+=` For reference only, that works out as a ratio of 1:${r1(fl)}:${r1(w)}.`;
   el.textContent=txt}
 function feedMath(e){const f=e.target.form,n=e.target.name;if(!f||f.dataset.form!=='feed')return;
   const set=(k,v)=>{f[k].value=Math.round(v)};
@@ -802,15 +846,19 @@ function feedMath(e){const f=e.target.form,n=e.target.name;if(!f||f.dataset.form
   if(jt!=null&&k!=null&&['jarTotal','tare','kept','ratio','target'].includes(n)){const d=jt-(num(f.tare.value)||0)-k;if(d>=0)set('discard',d)}
   ratio()}
 document.addEventListener('input',feedMath);
+function fillRoutine(f,v){const[d,fl,w]=v.split(',');f.rd.value=d;f.rf.value=fl;f.rw.value=w;f.querySelector('input[name=rstyle][value=fixed]').checked=true}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-fill]');if(b&&b.form)fillRoutine(b.form,b.dataset.fill)});
+document.addEventListener('change',e=>{const t=e.target;if(t.name==='build'&&t.form&&t.form.dataset.form==='starter')fillRoutine(t.form,t.value==='packet'?'180,90,90':'100,50,50')});
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.toggle==='guided'){const st=starter(t.dataset.id);if(st){st.guided=t.checked;save();render();toast('Guided mode '+(t.checked?'on':'off'))}}});
 
 /* ---------- forms ---------- */
 const FORMS={
   starter(f,id){let st=starter(id);const isNew=!st;if(isNew){st={id:uid(),log:[],createdAt:Date.now()};S.starters.push(st)}
-    Object.assign(st,{name:f.name.trim(),mode:f.mode,storage:f.storage,flour:f.flour.trim(),notes:f.notes.trim(),guided:f.guided==='1',startDate:f.startDate?new Date(f.startDate+'T12:00').getTime():Date.now()});
+    const fx=f.rstyle==='fixed';if(fx&&!(num(f.rf)>0&&num(f.rw)>0)){alert('Enter the flour and water amounts for your routine, or choose “By ratio”.');if(isNew)S.starters.pop();return null}
+    Object.assign(st,{build:f.build,routine:fx?{style:'fixed',discard:num(f.rd)||0,flour:num(f.rf),water:num(f.rw)}:{style:'ratio'},name:f.name.trim(),mode:f.mode,storage:f.storage,flour:f.flour.trim(),notes:f.notes.trim(),guided:f.guided==='1',startDate:f.startDate?new Date(f.startDate+'T12:00').getTime():Date.now()});
     return'#/starter/'+st.id},
   feed(f,id){const st=starter(id);if(num(f.tare)!=null)st.jarTare=num(f.tare);st.log.push({id:uid(),type:'feed',t:f.t?new Date(f.t).getTime():Date.now(),discard:num(f.discard),kept:num(f.kept),flour:num(f.flour),water:num(f.water),place:f.place,temp:toF(num(f.temp))});
-    toast('Feeding saved');return'#/starter/'+id},
+    toast(afterFeed(st)?st.name+' is now on its regular routine':'Feeding saved');return'#/starter/'+id},
   check(f,id){const st=starter(id),t=f.t?new Date(f.t).getTime():Date.now(),lf=st.log.filter(l=>l.type==='feed'&&l.t<=t).sort((a,b)=>b.t-a.t)[0];
     const c={id:uid(),type:'check',t,rise:f.rise,bubbles:f.bubbles,smell:f.smell,texture:f.texture,surface:f.surface||'normal',temp:toF(num(f.temp)),amount:num(f.amount),notes:(f.notes||'').trim(),hrs:lf?(t-lf.t)/H:null};
     c.tips=starterTips(st,c);st.log.push(c);return'#/starter/'+id},
@@ -828,7 +876,7 @@ const FORMS={
   chat(f,tk){if(aiBusy||!f.q.trim())return null;const[k,i]=tk==='general'?[]:tk.split(':');(AI.threads[tk]=AI.threads[tk]||[]).push({role:'user',content:f.q.trim()});saveAI();chatSend(tk,k,i);return location.hash},
   ai(){aiReadForm();if(!aiReady()){toast(!AI.key?'Enter your API key':!AI.model?'Choose a model':'Enter the API address');return null}toast('AI settings saved');return'#/chat'},
   wiz(f,id){const st=starter(id);if(!W||W.id!==id)return'#/starter/'+id;Object.assign(W.v,f);const{steps:A,plan}=wizPlan(st,W.v),x=A[Math.min(W.i,A.length-1)];
-    if(W.i>=A.length-1){const log=!x.stop&&!plan.none;if(log){wizFinish(st,W.v,plan);toast(plan.stir?'Stir logged':'Feed logged')}W=null;return'#/starter/'+id}
+    if(W.i>=A.length-1){const log=!x.stop&&!plan.none;if(log){wizFinish(st,W.v,plan);toast(afterFeed(st)?st.name+' is now on its regular routine':plan.stir?'Stir logged':'Feed logged')}W=null;return'#/starter/'+id}
     W.i++;window.scrollTo(0,0);return location.hash},
   remind(f){const R=S.settings.remind;R.on=f.on==='1';['feed','check','fridge','bake'].forEach(k=>R[k]=k in f);R.feedTime=f.feedTime||'08:00';R.quietFrom=f.quietFrom||'';R.quietTo=f.quietTo||'';
     if(R.on&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission().then(()=>bgSetup().then(render));else bgSetup().then(()=>{if(location.hash==='#/reminders')render()});toast('Reminders saved');return'#/reminders'},

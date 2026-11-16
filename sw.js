@@ -1,5 +1,5 @@
 // Offline cache: serve from cache first, refresh in the background.
-const CACHE = 'crumb-v3';
+const CACHE = 'crumb-v4';
 const DATA = 'crumb-data'; // reminder plan written by the app; must survive updates
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
